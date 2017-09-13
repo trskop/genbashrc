@@ -1,0 +1,64 @@
+name:                   genbashrc
+version:                0.1.0.0
+synopsis:               EDSL and application for generating .bashrc files.
+description:            TODO
+homepage:               https://github.com/trskop/genbashrc#readme
+license:                BSD3
+license-file:           LICENSE
+author:                 Peter Trško
+maintainer:             peter.trsko@gmail.com
+copyright:              (c) 2017 Peter Trško
+category:               Shell, System
+build-type:             Simple
+cabal-version:          >=1.10
+
+extra-source-files:     ChangeLog.md, README.md
+
+library
+  hs-source-dirs:       src
+  exposed-modules:
+    GenBashrc.Bash
+    GenBashrc.Distribution
+    GenBashrc.FilePath
+  --other-modules:
+
+  default-language:     Haskell2010
+
+  build-depends:
+      base >= 4.7 && < 5
+    , directory
+    , filepath
+    , mtl
+    , text
+
+  ghc-options:          -Wall
+
+executable genbashrc
+  hs-source-dirs:       app
+  main-is:              Main.hs
+  --other-modules:
+
+  default-language:     Haskell2010
+
+  build-depends:
+      base
+    , genbashrc
+    , directory
+    , filepath
+    , hostname
+    , text
+  ghc-options:         	-Wall -threaded -rtsopts -with-rtsopts=-N
+
+test-suite genbashrc-test
+  default-language:    	Haskell2010
+  type:                	exitcode-stdio-1.0
+  hs-source-dirs:      	test
+  main-is:             	Spec.hs
+  build-depends:
+      base
+    , genbashrc
+  ghc-options:         	-Wall -threaded -rtsopts -with-rtsopts=-N
+
+source-repository head
+  type:                 git
+  location:             https://github.com/trskop/genbashrc
