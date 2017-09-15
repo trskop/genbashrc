@@ -54,7 +54,7 @@ import Text.Show (Show(showsPrec), show)
 import Control.Monad.State (StateT, evalStateT, modify, state)
 import Control.Monad.Writer (WriterT, execWriterT, tell)
 import Data.Text (Text)
-import qualified Data.Text as Text (null)
+import qualified Data.Text as Text (null, singleton)
 import qualified Data.Text.Lazy as Lazy (Text)
 import qualified Data.Text.Lazy as Lazy.Text (fromStrict)
 import qualified Data.Text.Lazy.Builder as Text (Builder)
@@ -64,6 +64,8 @@ import qualified Data.Text.Lazy.Builder as Text.Builder
     , singleton
     , toLazyText
     )
+import System.FilePath.Posix (searchPathSeparator)
+
 
 data BashContext = BashContext
     { indentLevel :: Word
@@ -488,7 +490,9 @@ newtype PathString = PathString {getPathString :: Text}
 instance Semigroup PathString where
     "" <>  s = s
     s  <> "" = s
-    s1 <> s2 = coerce (\s1' s2' -> s1' <> ":" <> s2' :: Text) s1 s2
+    s1 <> s2 = coerce (\s1' s2' -> s1' <> pathSep <> s2' :: Text) s1 s2
+      where
+        pathSep = Text.singleton searchPathSeparator
 
 instance Monoid PathString where
     mempty = ""
