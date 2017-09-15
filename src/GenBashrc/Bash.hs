@@ -107,7 +107,16 @@ class Bashable t => BashableVar t where
     var = fromText
 
 newtype CommandName = CommandName {getCommandName :: Text}
-  deriving (Bashable, BashableStr, CmdArg, Eq, IsString, Monoid, Ord, Semigroup)
+  deriving
+    ( Bashable
+    , BashableStr
+    , CmdArg
+    , Eq
+    , IsString
+    , Monoid
+    , Ord
+    , Semigroup
+    )
 
 noop :: CommandName
 noop = ":"
@@ -517,7 +526,7 @@ instance IsPathString FilePath where
 
 instance IsPathString a => IsPathString (Maybe a) where
     toPathString = maybe "" toPathString
-    onPathString f = maybe empty (onPathString f)
+    onPathString = maybe empty . onPathString
 
 newtype PathElements t a = PathElements {getPathElements :: t a}
   deriving
