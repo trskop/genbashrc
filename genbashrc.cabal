@@ -1,7 +1,15 @@
 name:                   genbashrc
 version:                0.1.0.0
 synopsis:               EDSL and application for generating .bashrc files.
-description:            TODO
+description:
+  Generate @.bashrc@ using Haskell EDSL.
+  .
+  Most conditions, e.g. file existence checks, can be resolved in the
+  generator, therefore, the result will be a very simple and optimised
+  @.bashrc@ for a particular environment.
+  .
+  See README for more details.
+
 homepage:               https://github.com/trskop/genbashrc#readme
 license:                BSD3
 license-file:           LICENSE

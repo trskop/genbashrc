@@ -1,4 +1,17 @@
-# genbashrc
+# Genbashrc
+
+## Description
+
+Generate `.bashrc` using Haskell EDSL.
+
+Most conditions, e.g. file existence checks, can be resolved in the generator,
+therefore, the result will be a very simple and optimised `.bashrc` for a
+particular environment.
+
+
+## Usage
+
+Generate `.bashrc_generated` optimised for current machine and source it:
 
 ```Bash
 # ~/.bashrc: executed by bash(1) for non-login shells.
