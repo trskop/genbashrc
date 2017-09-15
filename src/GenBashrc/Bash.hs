@@ -107,6 +107,9 @@ class Bashable t => BashableVar t where
 newtype CommandName = CommandName {getCommandName :: Text}
   deriving (Bashable, BashableStr, CmdArg, Eq, IsString, Monoid, Ord, Semigroup)
 
+noop :: CommandName
+noop = ":"
+
 instance Show CommandName where
     showsPrec d (CommandName t) = showsPrec d t
 
@@ -288,7 +291,7 @@ bashIf cond onThen onElse = do
     text cond
     line @Text "; then"
     incIndentLevel
-    onThen <|> cmd ":"
+    onThen <|> cmd noop
     elseBranch <|> pure ()
     decIndentLevel
     line @Text "fi"
@@ -308,7 +311,7 @@ function :: FunctionName -> Bash () -> Bash ()
 function name body = do
     line $ "function " <> name <> "() {"
     incIndentLevel
-    body <|> cmd ":"
+    body <|> cmd noop
     decIndentLevel
     line @Text "}"
 
