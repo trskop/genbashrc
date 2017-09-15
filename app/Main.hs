@@ -231,11 +231,14 @@ editor Context{..} = asum
 -- * Run this application as a service. Output must be made available to Bash
 --   atomically.
 -- * Track dependencies and only when something changes produce new output.
+-- * Track changes in genbashrc so that output is recompiled when new version
+--   is deployed.
 
 main :: IO ()
 main = getArgs >>= \case
     [] -> main' Lazy.Text.putStr
-    [outputFileName] -> do
+    [outputFileName] ->
+        -- TODO: Make output writing an atomic operation.
         main' $ Lazy.Text.writeFile outputFileName
     _ -> error "Too many arguments."
 
