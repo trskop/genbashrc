@@ -114,7 +114,7 @@ userDir base relDir = liftIO $ case base of
     -- ^ Directory\/file FilePath relative to 'UserDirectory'.
     -> io (Maybe FilePath, FilePath)
 (?<</>) = userDirWithExistence
-infixr 5 <</>
+infixr 5 ?<</>
 
 userDirWithExistence
     :: MonadIO io
