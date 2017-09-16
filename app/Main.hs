@@ -3,7 +3,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 module Main (main)
   where
@@ -27,9 +26,8 @@ import Text.Show (Show)
 import Data.Text (Text)
 import qualified Data.Text.Lazy as Lazy (Text)
 import qualified Data.Text.Lazy.IO as Lazy.Text (putStr, writeFile)
---import qualified Data.Text as Text (pack)
 import Network.HostName (HostName, getHostName)
-import System.Directory (doesDirectoryExist, doesFileExist, getHomeDirectory)
+import System.Directory (getHomeDirectory)
 import System.FilePath ((</>))
 
 import GenBashrc.Bash
@@ -69,29 +67,25 @@ data Context = Context
   deriving (Eq, Show)
 
 context :: IO Context
-context = do
-    homeDir <- getHomeDirectory
-    mkContext
-        <$> getHostName
-        <*> pure homeDir
-        <*> getUserDir (homeDir </> "bin")
-        <*> getUserDir (homeDir </> ".local" </> "bin")
-        <*> haveExecutable "sudo"
-        <*> haveExecutable "vim"
-        <*> haveExecutable "nvim"
-        <*> haveExecutable "mplayer"
-        <*> ( haveExecutable "xpdf-compat"
-            `orA` doesFileExist (homeDir </> "bin" </> "xpdf-compat")
-            )
-        <*> haveExecutable "colordiff"
-        <*> haveExecutable "screen"
-        <*> haveExecutable "lesspipe"
-        <*> haveExecutable "dircolors"
-        <*> haveExecutable "xinput"
-        <*> haveExecutable "git"
-        <*> lookupBashCompletionScript
-        <*> lookupGitPromptScript
-        <*> checkFiles [homeDir </> ".dircolors"]
+context = mkContext
+    <$> getHostName
+    <*> getHomeDirectory
+    <*> (Home ?<</> "bin")
+    <*> (DotLocal ?<</> "bin")
+    <*> haveExecutable "sudo"
+    <*> haveExecutable "vim"
+    <*> haveExecutable "nvim"
+    <*> haveExecutable "mplayer"
+    <*> (haveExecutable "xpdf-compat" `orA` doesUserHaveXpdfCompat)
+    <*> haveExecutable "colordiff"
+    <*> haveExecutable "screen"
+    <*> haveExecutable "lesspipe"
+    <*> haveExecutable "dircolors"
+    <*> haveExecutable "xinput"
+    <*> haveExecutable "git"
+    <*> lookupBashCompletionScript
+    <*> lookupGitPromptScript
+    <*> checkFilesM [Home <</> ".dircolors"]
   where
     mkContext hn homeDir (binDir, binDir') (localBinDir, localBinDir') sudo vim
       neovim mplayer xpdfCompat colordiff screen lesspipe' dircolors xinput git
@@ -126,13 +120,12 @@ context = do
             , userDircolors = userDircolors'
             }
 
-    getUserDir dir = do
-        haveDir <- doesDirectoryExist dir
-        pure . (, dir) $ if haveDir
-            then Just dir
-            else Nothing
-
     orA = liftA2 (||)
+
+    doesUserHaveXpdfCompat = isJust <$> checkFilesM
+        [ Home <</> "bin" </> "xpdf-compat"
+        , DotLocal <</> "bin" </> "xpdf-compat"
+        ]
 
     lookupBashCompletionScript = checkFiles
         [ "/usr/share/bash-completion/bash_completion"
