@@ -206,8 +206,8 @@ history _ = do
 setPrompt :: Context -> Bash ()
 setPrompt Context{..} = do
     when haveScreen
-        . function "__screen_ps1" $ do
-            line @Text "[[ -n \"${WINDOW}\" ]] && echo \"#${WINDOW}\""
+        . function "__screen_ps1"
+            $ line @Text "[[ -n \"${WINDOW}\" ]] && echo \"#${WINDOW}\""
 
     prompt (Proxy @'PS1) $ "'\\[\\e[32m\\][ \\[\\e[37m\\]\\u@\\h" <> screenPs1
         <> " \\W" <> gitPs1 <> "\\[\\e[32m\\] ]\\$\\[\\e[22;0m\\] '"
