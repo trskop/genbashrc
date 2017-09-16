@@ -33,6 +33,7 @@ import System.FilePath ((</>))
 import GenBashrc.Bash
 import GenBashrc.Distribution
 import GenBashrc.FilePath
+import qualified GenBashrc.SystemInfo as SystemInfo
 
 --import Debug.Trace (traceShowId)
 
@@ -86,10 +87,11 @@ context = mkContext
     <*> lookupBashCompletionScript
     <*> lookupGitPromptScript
     <*> checkFilesM [Home <</> ".dircolors"]
+    <*> SystemInfo.haveCdrom
   where
     mkContext hn homeDir (binDir, binDir') (localBinDir, localBinDir') sudo vim
       neovim mplayer xpdfCompat colordiff screen lesspipe' dircolors xinput git
-      bashCompletionScript' gitPromptScript' userDircolors' =
+      bashCompletionScript' gitPromptScript' userDircolors' haveCdrom =
         Context
             { hostname = hn
             , packageManger = distrubutionPackageManager Debian -- TODO
@@ -107,7 +109,7 @@ context = mkContext
             , haveLessPipe = lesspipe'
             , haveDircolors = dircolors
             , haveXinput = xinput
-            , haveCdrom = False -- TODO
+            , haveCdrom = haveCdrom
             , haveGit = git
             , canCloseCdrom = False -- TODO
             , home = homeDir
@@ -136,14 +138,6 @@ context = mkContext
         [ "/usr/lib/git-core/git-sh-prompt"
         , "/etc/bash_completion.d/git-prompt"
         ]
-
-    checkFiles :: [FilePath] -> IO (Maybe FilePath)
-    checkFiles []             = pure Nothing
-    checkFiles (file : files) = do
-        doesExist <- doesFileExist file
-        if doesExist
-            then pure $ Just file
-            else checkFiles files
 
 aliases :: Context -> Bash ()
 aliases Context{..} = do

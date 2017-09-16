@@ -28,6 +28,7 @@ library
     GenBashrc.Bash
     GenBashrc.Distribution
     GenBashrc.FilePath
+    GenBashrc.SystemInfo
   --other-modules:
 
   default-language:     Haskell2010
