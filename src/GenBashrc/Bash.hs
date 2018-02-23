@@ -558,11 +558,8 @@ exportPathIf p = when p exportPath
 exportPath :: Bash ()
 exportPath = export "PATH" Nothing
 
-lesspipeWhen :: Bool -> Bash ()
-lesspipeWhen condition = when condition evalLesspipe
-
-evalLesspipe :: Bash ()
-evalLesspipe = eval "\"$(SHELL=/bin/sh lesspipe)\""
+evalLesspipe :: CommandName -> Bash ()
+evalLesspipe c = eval' $ "\"$(SHELL=/bin/sh " <> c <> ")\""
 
 setEditor :: BashString -> Bash ()
 setEditor e = do

@@ -9,6 +9,21 @@ therefore, the result will be a very simple and optimised `.bashrc` for a
 particular environment.
 
 
+### Dependencies
+
+## MacOS
+
+```
+brew install haskell-stack
+```
+
+Optional:
+
+```
+brew install bash bash-completion colordiff lesspipe git neovim
+```
+
+
 ## Install
 
 ```Bash
@@ -16,6 +31,7 @@ git clone git@github.com:trskop/genbashrc.git ~/.local/src/trskop/genbashrc
 cd ~/.local/src/trskop/genbashrc
 stack install
 ```
+
 
 ## Usage
 

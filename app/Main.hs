@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -11,14 +12,15 @@ import Prelude (error)
 
 import Control.Applicative (Applicative, (*>), (<*>), liftA2, pure)
 import Control.Monad ((>>=), guard, unless, when)
-import Data.Bool (Bool(False), (&&), (||), not)
+import Data.Bool (Bool(False), (&&), (||), bool, not)
 import Data.Eq (Eq)
-import Data.Foldable (asum)
+import Data.Foldable (asum, for_)
 import Data.Function (($), (.))
 import Data.Functor ((<$>))
 import Data.Maybe (Maybe(Just, Nothing), isJust, maybe)
 import Data.Monoid ((<>))
 import Data.Proxy (Proxy(Proxy))
+import Data.String (fromString)
 import System.Environment (getArgs)
 import System.IO (FilePath, IO)
 import Text.Show (Show)
@@ -31,17 +33,18 @@ import System.Directory (getHomeDirectory)
 import System.FilePath ((</>))
 
 import GenBashrc.Bash
-import GenBashrc.Distribution
 import GenBashrc.FilePath
+import GenBashrc.Os
+import qualified GenBashrc.Os.Linux as Linux
+import GenBashrc.PackageManager
 import qualified GenBashrc.SystemInfo as SystemInfo
 
 --import Debug.Trace (traceShowId)
 
 
 data Context = Context
-    { hostname :: HostName
-    , packageManger :: Maybe PackageManager
-    , distribution :: Distribution
+    { currentOs :: OsInfo
+    , hostname :: HostName
     , haveTouchpad :: Bool
     , haveSudo :: Bool
     , haveMplayer :: Bool
@@ -50,7 +53,6 @@ data Context = Context
     , haveScreen :: Bool
     , haveNeovim :: Bool
     , haveVim :: Bool
-    , haveLessPipe :: Bool
     , haveDircolors :: Bool
     , haveXinput :: Bool
     , haveCdrom :: Bool
@@ -64,38 +66,41 @@ data Context = Context
     , bashCompletionScript :: Maybe FilePath
     , gitPromptScript :: Maybe FilePath
     , userDircolors :: Maybe FilePath
+    , lesspipeCommand :: Maybe CommandName
     }
   deriving (Eq, Show)
 
 context :: IO Context
-context = mkContext
-    <$> getHostName
-    <*> getHomeDirectory
-    <*> (Home ?<</> "bin")
-    <*> (DotLocal ?<</> "bin")
-    <*> haveExecutable "sudo"
-    <*> haveExecutable "vim"
-    <*> haveExecutable "nvim"
-    <*> haveExecutable "mplayer"
-    <*> (haveExecutable "xpdf-compat" `orA` doesUserHaveXpdfCompat)
-    <*> haveExecutable "colordiff"
-    <*> haveExecutable "screen"
-    <*> haveExecutable "lesspipe"
-    <*> haveExecutable "dircolors"
-    <*> haveExecutable "xinput"
-    <*> haveExecutable "git"
-    <*> lookupBashCompletionScript
-    <*> lookupGitPromptScript
-    <*> checkFilesM [Home <</> ".dircolors"]
-    <*> SystemInfo.haveCdrom
+context = do
+    os <- SystemInfo.detectOs
+    mkContext os
+        <$> getHostName
+        <*> getHomeDirectory
+        <*> (Home ?<</> "bin")
+        <*> (DotLocal ?<</> "bin")
+        <*> haveExecutable "sudo"
+        <*> haveExecutable "vim"
+        <*> haveExecutable "nvim"
+        <*> haveExecutable "mplayer"
+        <*> (haveExecutable "xpdf-compat" `orA` doesUserHaveXpdfCompat)
+        <*> haveExecutable "colordiff"
+        <*> haveExecutable "screen"
+        <*> haveExecutable "dircolors"
+        <*> haveExecutable "xinput"
+        <*> haveExecutable "git"
+        <*> lookupLesspipeCommand
+        <*> lookupBashCompletionScript
+        <*> lookupGitPromptScript os
+        <*> checkFilesM [Home <</> ".dircolors"]
+        <*> SystemInfo.haveCdrom
   where
-    mkContext hn homeDir (binDir, binDir') (localBinDir, localBinDir') sudo vim
-      neovim mplayer xpdfCompat colordiff screen lesspipe' dircolors xinput git
-      bashCompletionScript' gitPromptScript' userDircolors' haveCdrom =
+    mkContext os hn homeDir (binDir, binDir') (localBinDir, localBinDir') sudo
+      vim neovim mplayer xpdfCompat colordiff screen dircolors xinput git
+      lesspipe' bashCompletionScript' gitPromptScript' userDircolors'
+      haveCdrom =
         Context
             { hostname = hn
-            , packageManger = distrubutionPackageManager Debian -- TODO
-            , distribution = debian Buster "testing" -- TODO
+            , currentOs = os
             , haveTouchpad = False -- TODO
                 -- $ grep "^N: Name=.* Touchpad" /proc/bus/input/devices
                 -- N: Name="ELAN1200:00 04F3:3059 Touchpad"
@@ -106,7 +111,6 @@ context = mkContext
             , haveScreen = screen
             , haveNeovim = neovim
             , haveVim = vim
-            , haveLessPipe = lesspipe'
             , haveDircolors = dircolors
             , haveXinput = xinput
             , haveCdrom = haveCdrom
@@ -120,6 +124,7 @@ context = mkContext
             , bashCompletionScript = bashCompletionScript'
             , gitPromptScript = gitPromptScript'
             , userDircolors = userDircolors'
+            , lesspipeCommand = lesspipe'
             }
 
     orA = liftA2 (||)
@@ -132,48 +137,83 @@ context = mkContext
     lookupBashCompletionScript = checkFiles
         [ "/usr/share/bash-completion/bash_completion"
         , "/etc/bash_completion"
+        , "/usr/local/etc/bash_completion"
         ]
 
-    lookupGitPromptScript = checkFiles
-        [ "/usr/lib/git-core/git-sh-prompt"
-        , "/etc/bash_completion.d/git-prompt"
-        ]
+    lookupGitPromptScript = checkFiles . \case
+        Linux _ ->
+            [ "/usr/lib/git-core/git-sh-prompt"
+            , "/etc/bash_completion.d/git-prompt"
+            , usrLocal
+            ]
+        MacOs _ ->
+            [ usrLocal
+            , "/Applications/Xcode.app/Contents/Developer/usr/share/git-core/git-prompt.sh"
+            ]
+      where
+        usrLocal = "/usr/local/etc/bash_completion.d/git-prompt"
+
+    lookupLesspipeCommand =
+        lookupCommand "lesspipe"
+            >>= maybe (lookupCommand "lesspipe.sh") (pure . Just)
+      where
+        lookupCommand c =
+            bool Nothing (Just $ fromString c) <$> haveExecutable c
+
+portableColourisedAliases :: Context -> Bash ()
+portableColourisedAliases Context{..} = do
+    alias "egrep" "'egrep --color=auto'"
+    alias "fgrep" "'fgrep --color=auto'"
+    alias "grep" "'grep --color=auto'"
+
+    when haveColorDiff $ alias "diff" "colordiff"
+
+vimAliasForNeovim :: Context -> Bash ()
+vimAliasForNeovim Context{haveNeovim} = when haveNeovim $ alias "vim" "neovim"
+    -- TODO: Consider using full path to neovim binary.
 
 aliases :: Context -> Bash ()
-aliases Context{..} = do
-    withDircollorsWhen haveDircolors userDircolors $ do
-        alias "ls" "'ls --color=auto'"
-        alias "dir" "'dir --color=auto'"
-        alias "vdir" "'vdir --color=auto'"
-
-        alias "egrep" "'egrep --color=auto'"
-        alias "fgrep" "'fgrep --color=auto'"
-        alias "grep" "'grep --color=auto'"
-
-        when haveColorDiff $ alias "diff" "colordiff"
-
+aliases ctx@Context{..} = do
     alias "cp" "'cp -i'"
     alias "mv" "'mv -i'"
     alias "rm" "'rm -i'"
 
-    whenIsApt packageManger $ do
-        alias "apt-get" "'sudo apt-get'"
-        alias "apt"     "'sudo apt'"
+    whenOs linux currentOs $ \linuxOs -> do
+        withDircollorsWhen haveDircolors userDircolors $ do
+            alias "ls" "'ls --color=auto'"
+            alias "dir" "'dir --color=auto'"
+            alias "vdir" "'vdir --color=auto'"
+
+            portableColourisedAliases ctx
+
+        Linux.whenDistro_ Linux.notDebianCompat linuxOs
+            $ vimAliasForNeovim ctx
+
+        whenPackageManager_ Linux.apt linuxOs $ do
+            alias "apt-get" "'sudo apt-get'"
+            alias "apt"     "'sudo apt'"
+
+        when (haveTouchpad && haveXinput) $ do
+            -- TODO: Rewrite following to use xinput.
+            alias "touchpad-off" "'synclient TouchpadOff=1'"
+            alias "touchpad-on"  "'synclient TouchpadOff=0'"
+
+        when haveCdrom $ do
+            alias "eject" "eject -d"
+            unless canCloseCdrom $ alias "close" "eject -d -t"
+
+    whenOs_ macOs currentOs $ do
+        alias "ls" "'ls -G'"
+
+        portableColourisedAliases ctx
+        vimAliasForNeovim ctx
 
     alias "evil" $ if haveSudo then "'sudo su -'" else "'su -'"
 
     when haveMplayer $ alias "mplayer" "'mplayer -idx'"
     when haveXpdfCompat $ alias "xpdf" "xpdf-compat"
+
     alias "term-title" "'printf \"\\033]2;%s\\007\"'"
-
-    when (haveTouchpad && haveXinput) $ do
-        -- TODO: Rewrite following to use xinput.
-        alias "touchpad-off" "'synclient TouchpadOff=1'"
-        alias "touchpad-on"  "'synclient TouchpadOff=0'"
-
-    when haveCdrom $ do
-        alias "eject" "eject -d"
-        unless canCloseCdrom $ alias "close" "eject -d -t"
 
 history :: Context -> Bash ()
 history _ = do
@@ -212,6 +252,9 @@ editor Context{..} = asum
         guard haveVim
         setEditor "vim"
     ]
+
+stackBashCompletion :: Bash ()
+stackBashCompletion = eval "\"$(stack --bash-completion-script stack)\""
 
 -- Ideas:
 --
@@ -252,7 +295,7 @@ main' writeOutput = do
 
         history ctx
 
-        lesspipeWhen haveLessPipe
+        onJust lesspipeCommand evalLesspipe
 
         pathUpdated <- updatePath Prepend $ PathElements
             [ guard (not userBinDirInPath) *> userBinDir
@@ -267,9 +310,12 @@ main' writeOutput = do
         aliases ctx
 
         onJust bashCompletionScript $ \script ->
-            bashIfThen "! shopt -oq posix" $ source script
+            bashIfThen "! shopt -oq posix" $ do
+                () <- source script
+                whenOs_ macOs currentOs
+                    stackBashCompletion
 
         when haveGit $ onJust gitPromptScript source
 
 onJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
-onJust x f = maybe (pure ()) f x
+onJust = for_
