@@ -29,7 +29,7 @@ import Data.Text (Text)
 import qualified Data.Text.Lazy as Lazy (Text)
 import qualified Data.Text.Lazy.IO as Lazy.Text (putStr, writeFile)
 import Network.HostName (HostName, getHostName)
-import System.Directory (getHomeDirectory)
+import System.Directory (findExecutable, getHomeDirectory)
 import System.FilePath ((</>))
 
 import GenBashrc.Bash
@@ -67,6 +67,7 @@ data Context = Context
     , gitPromptScript :: Maybe FilePath
     , userDircolors :: Maybe FilePath
     , lesspipeCommand :: Maybe CommandName
+    , stackBin :: Maybe FilePath
     }
   deriving (Eq, Show)
 
@@ -93,11 +94,12 @@ context = do
         <*> lookupGitPromptScript os
         <*> checkFilesM [Home <</> ".dircolors"]
         <*> SystemInfo.haveCdrom
+        <*> lookupStack
   where
     mkContext os hn homeDir (binDir, binDir') (localBinDir, localBinDir') sudo
       vim neovim mplayer xpdfCompat colordiff screen dircolors xinput git
       lesspipe' bashCompletionScript' gitPromptScript' userDircolors'
-      haveCdrom =
+      haveCdrom stack =
         Context
             { hostname = hn
             , currentOs = os
@@ -125,6 +127,7 @@ context = do
             , gitPromptScript = gitPromptScript'
             , userDircolors = userDircolors'
             , lesspipeCommand = lesspipe'
+            , stackBin = stack
             }
 
     orA = liftA2 (||)
@@ -159,6 +162,14 @@ context = do
       where
         lookupCommand c =
             bool Nothing (Just $ fromString c) <$> haveExecutable c
+
+    lookupStack =
+        checkHomeBins >>= maybe (findExecutable "stack") (pure . Just)
+      where
+        checkHomeBins = checkFilesM
+          [ Home <</> "bin" </> "stack"
+          , DotLocal <</> "bin" </> "stack"
+          ]
 
 portableColourisedAliases :: Context -> Bash ()
 portableColourisedAliases Context{..} = do
@@ -311,9 +322,10 @@ main' writeOutput = do
 
         onJust bashCompletionScript $ \script ->
             bashIfThen "! shopt -oq posix" $ do
-                () <- source script
-                whenOs_ macOs currentOs
-                    stackBashCompletion
+                () <- source_ script
+                onJust stackBin $ \stack ->
+                    when ((stack `isInDir` home) || (macOs `isOs` currentOs))
+                        stackBashCompletion
 
         when haveGit $ onJust gitPromptScript source
 

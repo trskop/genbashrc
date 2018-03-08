@@ -3,7 +3,7 @@
 -- |
 -- Module:      GenBashrc.FilePath
 -- Description: FilePath utilities.
--- Copyright:   (c) 2017 Peter Trško
+-- Copyright:   (c) 2017-2018 Peter Trško
 -- License:     BSD3
 --
 -- Maintainer:  peter.trsko@gmail.com
@@ -17,6 +17,7 @@ module GenBashrc.FilePath
     , checkFiles
     , checkFilesM
     , checkDirs
+    , isInDir
 
     -- * User Directories
     , UserDirectory(..)
@@ -34,8 +35,9 @@ import Control.Applicative (pure)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Bool (Bool)
 import Data.Foldable (any)
-import Data.Function (($), (.), on)
+import Data.Function (($), (.), flip, on)
 import Data.Functor ((<$>))
+import qualified Data.List as List (isPrefixOf)
 import Data.Maybe (Maybe(Just, Nothing), isJust)
 import System.IO (FilePath)
 
@@ -57,6 +59,7 @@ import System.FilePath
     , equalFilePath
     , getSearchPath
     , normalise
+    , splitDirectories
     )
 
 
@@ -155,3 +158,11 @@ checkDirs (dir : dirs) = do
     if doesExist
         then pure $ Just dir
         else checkDirs dirs
+
+-- | Check if @path@ is in @dir@, i.e. @dir@ is a directory prefix of @path@.
+--
+-- @
+-- \"\/foo\/bar\/baz" \`isInDir\` \"\/foo\"
+-- @
+isInDir :: FilePath -> FilePath -> Bool
+isInDir = flip List.isPrefixOf `on` splitDirectories

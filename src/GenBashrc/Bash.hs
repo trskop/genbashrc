@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
@@ -8,6 +7,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -454,16 +454,16 @@ instance CmdArg Lazy.Text where
 instance CmdArg String where
     cmdArg = fromString
 
-type (:->) args r = args
+type (:->) args r = CmdResult args ~ r => args
 
-cmd :: forall r args
-    . (CmdArgs args, CmdResult args ~ r)
-    => CommandName
-    -> args :-> r
+cmd :: forall r args. CmdArgs args => CommandName -> args :-> r
 cmd name = cmdArgs Nothing (cmdArg name)
 
-source :: forall r args. (CmdArgs args, CmdResult args ~ r) => args :-> r
+source :: forall r args. CmdArgs args => args :-> r
 source = cmd "."
+
+source_ :: forall args. CmdArgs args => args :-> Bash ()
+source_ = source
 
 -- | @expand "foo" ~> $(foo)@
 expand

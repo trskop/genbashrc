@@ -17,14 +17,16 @@ module GenBashrc.Os
     , macOs
     , whenOs
     , whenOs_
+    , isOs
     )
   where
 
 import Control.Applicative (Applicative)
+import Data.Bool (Bool)
 import Data.Eq (Eq)
 import Data.Foldable (for_)
-import Data.Function ((.), const)
-import Data.Maybe (Maybe(Just, Nothing))
+import Data.Function (($), (.), const)
+import Data.Maybe (Maybe(Just, Nothing), isJust)
 import Text.Show (Show)
 
 import GenBashrc.Os.Linux (LinuxInfo)
@@ -76,3 +78,6 @@ whenOs patternMatch = for_ . patternMatch
 -- @
 whenOs_ :: Applicative f => (OsInfo -> Maybe a) -> OsInfo -> f () -> f ()
 whenOs_ patternMatch os action = whenOs patternMatch os (const action)
+
+isOs :: (OsInfo -> Maybe a) -> OsInfo -> Bool
+isOs = (isJust .) . ($)
