@@ -150,7 +150,7 @@ matchPackageManager
     :: (PackageManager -> Bool)
     -> SomePackageManager
     -> Maybe PackageManager
-matchPackageManager p somePkgMgr = do
+matchPackageManager p (SomePackageManager somePkgMgr) = do
     pkgMgr <- cast somePkgMgr
     pkgMgr <$ guard (p pkgMgr)
 
