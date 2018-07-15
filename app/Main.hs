@@ -51,6 +51,7 @@ data Context = Context
     , haveXpdfCompat :: Bool
     , haveColorDiff :: Bool
     , haveScreen :: Bool
+    , haveTmux :: Bool
     , haveNeovim :: Bool
     , haveVim :: Bool
     , haveDircolors :: Bool
@@ -68,6 +69,7 @@ data Context = Context
     , userDircolors :: Maybe FilePath
     , lesspipeCommand :: Maybe CommandName
     , stackBin :: Maybe FilePath
+    , tmuxConfig :: Maybe FilePath
     }
   deriving (Eq, Show)
 
@@ -86,6 +88,7 @@ context = do
         <*> (haveExecutable "xpdf-compat" `orA` doesUserHaveXpdfCompat)
         <*> haveExecutable "colordiff"
         <*> haveExecutable "screen"
+        <*> haveExecutable "tmux"
         <*> haveExecutable "dircolors"
         <*> haveExecutable "xinput"
         <*> haveExecutable "git"
@@ -95,11 +98,12 @@ context = do
         <*> checkFilesM [Home <</> ".dircolors"]
         <*> SystemInfo.haveCdrom
         <*> lookupStack
+        <*> checkFilesM [xdgConfig <</> "tmux" </> "tmux.conf"]
   where
     mkContext os hn homeDir (binDir, binDir') (localBinDir, localBinDir') sudo
-      vim neovim mplayer xpdfCompat colordiff screen dircolors xinput git
+      vim neovim mplayer xpdfCompat colordiff screen tmux dircolors xinput git
       lesspipe' bashCompletionScript' gitPromptScript' userDircolors'
-      haveCdrom stack =
+      haveCdrom stack xdgTmuxConfig =
         Context
             { hostname = hn
             , currentOs = os
@@ -111,6 +115,7 @@ context = do
             , haveXpdfCompat = xpdfCompat
             , haveColorDiff = colordiff
             , haveScreen = screen
+            , haveTmux = tmux
             , haveNeovim = neovim
             , haveVim = vim
             , haveDircolors = dircolors
@@ -128,6 +133,7 @@ context = do
             , userDircolors = userDircolors'
             , lesspipeCommand = lesspipe'
             , stackBin = stack
+            , tmuxConfig = xdgTmuxConfig
             }
 
     orA = liftA2 (||)
@@ -223,6 +229,12 @@ aliases ctx@Context{..} = do
 
     when haveMplayer $ alias "mplayer" "'mplayer -idx'"
     when haveXpdfCompat $ alias "xpdf" "xpdf-compat"
+
+    when haveTmux
+        . alias "tmux"
+            $ "'TERM=xterm-256color tmux"
+            <> maybe "" (\cfg -> " -f \"" <> fromString cfg <> "\"") tmuxConfig
+            <> "'"
 
     alias "term-title" "'printf \"\\033]2;%s\\007\"'"
 
