@@ -259,8 +259,12 @@ setPrompt Context{..} = do
         . function "__screen_ps1"
             $ line @Text "[[ -n \"${WINDOW}\" ]] && echo \"#${WINDOW}\""
 
-    prompt (Proxy @'PS1) $ "'\\[\\e[32m\\][ \\[\\e[37m\\]\\u@\\h" <> screenPs1
-        <> " \\W" <> gitPs1 <> "\\[\\e[32m\\] ]\\$\\[\\e[22;0m\\] '"
+    prompt (Proxy @'PS1)
+        $ "'\\[\\e[32m\\][ \\[\\e[37m\\]\\u@\\h"
+        <> screenPs1
+        <> " \\W${CD_LEVEL:+⟨${CD_LEVEL}⟩}"
+        <> gitPs1
+        <> "\\[\\e[32m\\] ]\\$\\[\\e[22;0m\\] '"
     exportPrompt (Proxy @'PS1)
   where
     screenPs1 = if haveScreen then "$(__screen_ps1)" else ""
