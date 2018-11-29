@@ -10,9 +10,9 @@ module Main (main)
 
 import Prelude (error)
 
-import Control.Applicative (Applicative, (*>), (<*>), liftA2, pure)
+import Control.Applicative (Applicative, (*>), (<*>), liftA2)
 import Control.Monad ((>>=), guard, unless, when)
-import Data.Bool (Bool(False), (&&), (||), bool, not)
+import Data.Bool (Bool(False), (&&), (||), not)
 import Data.Eq (Eq)
 import Data.Foldable (asum, for_)
 import Data.Function (($), (.))
@@ -29,7 +29,7 @@ import Data.Text (Text)
 import qualified Data.Text.Lazy as Lazy (Text)
 import qualified Data.Text.Lazy.IO as Lazy.Text (putStr, writeFile)
 import Network.HostName (HostName, getHostName)
-import System.Directory (findExecutable, getHomeDirectory)
+import System.Directory (getHomeDirectory)
 import System.FilePath ((</>))
 
 import GenBashrc.Bash
@@ -38,6 +38,7 @@ import GenBashrc.Os
 import qualified GenBashrc.Os.Linux as Linux
 import GenBashrc.PackageManager
 import qualified GenBashrc.SystemInfo as SystemInfo
+import qualified GenBashrc.Utils as Utils
 
 --import Debug.Trace (traceShowId)
 
@@ -92,12 +93,12 @@ context = do
         <*> haveExecutable "dircolors"
         <*> haveExecutable "xinput"
         <*> haveExecutable "git"
-        <*> lookupLesspipeCommand
-        <*> lookupBashCompletionScript
-        <*> lookupGitPromptScript os
+        <*> Utils.lookupLesspipeCommand
+        <*> Utils.lookupBashCompletionScript
+        <*> Utils.lookupGitPromptScript os
         <*> checkFilesM [Home <</> ".dircolors"]
         <*> SystemInfo.haveCdrom
-        <*> lookupStack
+        <*> Utils.lookupStack
         <*> checkFilesM [xdgConfig <</> "tmux" </> "tmux.conf"]
   where
     mkContext os hn homeDir (binDir, binDir') (localBinDir, localBinDir') sudo
@@ -143,66 +144,15 @@ context = do
         , DotLocal <</> "bin" </> "xpdf-compat"
         ]
 
-    lookupBashCompletionScript = checkFiles
-        [ "/usr/share/bash-completion/bash_completion"
-        , "/etc/bash_completion"
-        , "/usr/local/etc/bash_completion"
-        ]
-
-    lookupGitPromptScript = checkFiles . \case
-        Linux _ ->
-            [ "/usr/lib/git-core/git-sh-prompt"
-            , "/etc/bash_completion.d/git-prompt"
-            , usrLocal
-            ]
-        MacOs _ ->
-            [ usrLocal
-            , "/Applications/Xcode.app/Contents/Developer/usr/share/git-core/git-prompt.sh"
-            ]
-      where
-        usrLocal = "/usr/local/etc/bash_completion.d/git-prompt"
-
-    lookupLesspipeCommand =
-        lookupCommand "lesspipe"
-            >>= maybe (lookupCommand "lesspipe.sh") (pure . Just)
-      where
-        lookupCommand c =
-            bool Nothing (Just $ fromString c) <$> haveExecutable c
-
-    lookupStack =
-        checkHomeBins >>= maybe (findExecutable "stack") (pure . Just)
-      where
-        checkHomeBins = checkFilesM
-          [ Home <</> "bin" </> "stack"
-          , DotLocal <</> "bin" </> "stack"
-          ]
-
-portableColourisedAliases :: Context -> Bash ()
-portableColourisedAliases Context{..} = do
-    alias "egrep" "'egrep --color=auto'"
-    alias "fgrep" "'fgrep --color=auto'"
-    alias "grep" "'grep --color=auto'"
-
-    when haveColorDiff $ alias "diff" "colordiff"
-
 vimAliasForNeovim :: Context -> Bash ()
-vimAliasForNeovim Context{haveNeovim} = when haveNeovim $ alias "vim" "neovim"
+vimAliasForNeovim Context{haveNeovim} = when haveNeovim $ alias "vim" "nvim"
     -- TODO: Consider using full path to neovim binary.
 
 aliases :: Context -> Bash ()
 aliases ctx@Context{..} = do
-    alias "cp" "'cp -i'"
-    alias "mv" "'mv -i'"
-    alias "rm" "'rm -i'"
+    Utils.standardAliases Utils.AliasOptions{..}
 
     whenOs linux currentOs $ \linuxOs -> do
-        withDircollorsWhen haveDircolors userDircolors $ do
-            alias "ls" "'ls --color=auto'"
-            alias "dir" "'dir --color=auto'"
-            alias "vdir" "'vdir --color=auto'"
-
-            portableColourisedAliases ctx
-
         Linux.whenDistro_ Linux.notDebianCompat linuxOs
             $ vimAliasForNeovim ctx
 
@@ -219,11 +169,8 @@ aliases ctx@Context{..} = do
             alias "eject" "eject -d"
             unless canCloseCdrom $ alias "close" "eject -d -t"
 
-    whenOs_ macOs currentOs $ do
-        alias "ls" "'ls -G'"
-
-        portableColourisedAliases ctx
-        vimAliasForNeovim ctx
+    whenOs_ macOs currentOs
+        $ vimAliasForNeovim ctx
 
     alias "evil" $ if haveSudo then "'sudo su -'" else "'su -'"
 
@@ -279,9 +226,6 @@ editor Context{..} = asum
         guard haveVim
         setEditor "vim"
     ]
-
-stackBashCompletion :: Bash ()
-stackBashCompletion = eval "\"$(stack --bash-completion-script stack)\""
 
 -- Ideas:
 --
@@ -341,7 +285,7 @@ main' writeOutput = do
                 () <- source_ script
                 onJust stackBin $ \stack ->
                     when ((stack `isInDir` home) || (macOs `isOs` currentOs))
-                        stackBashCompletion
+                        Utils.stackBashCompletion
 
         when haveGit $ onJust gitPromptScript source
 

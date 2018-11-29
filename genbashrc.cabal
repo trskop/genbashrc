@@ -32,6 +32,7 @@ library
     GenBashrc.Os.MacOs
     GenBashrc.PackageManager
     GenBashrc.SystemInfo
+    GenBashrc.Utils
   --other-modules:
 
   default-language:     Haskell2010
