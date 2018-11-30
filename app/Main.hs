@@ -10,11 +10,11 @@ module Main (main)
 
 import Prelude (error)
 
-import Control.Applicative (Applicative, (*>), (<*>), liftA2)
+import Control.Applicative (Applicative, (*>), liftA2, pure)
 import Control.Monad ((>>=), guard, unless, when)
 import Data.Bool (Bool(False), (&&), (||), not)
 import Data.Eq (Eq)
-import Data.Foldable (asum, for_)
+import Data.Foldable (for_)
 import Data.Function (($), (.))
 import Data.Functor ((<$>))
 import Data.Maybe (Maybe(Just, Nothing), isJust, maybe)
@@ -77,76 +77,73 @@ data Context = Context
 
 context :: IO Context
 context = do
-    os <- SystemInfo.detectOs
-    mkContext os
-        <$> getHostName
-        <*> getHomeDirectory
-        <*> (Home ?<</> "bin")
-        <*> (DotLocal ?<</> "bin")
-        <*> haveExecutable "sudo"
-        <*> haveExecutable "vim"
-        <*> haveExecutable "nvim"
-        <*> haveExecutable "mplayer"
-        <*> (haveExecutable "xpdf-compat" `orA` doesUserHaveXpdfCompat)
-        <*> haveExecutable "colordiff"
-        <*> haveExecutable "screen"
-        <*> haveExecutable "tmux"
-        <*> haveExecutable "dircolors"
-        <*> haveExecutable "xinput"
-        <*> haveExecutable "git"
-        <*> Utils.lookupLesspipeCommand
-        <*> Utils.lookupBashCompletionScript
-        <*> Utils.lookupGitPromptScript os
-        <*> checkFilesM [Home <</> ".dircolors"]
-        <*> SystemInfo.haveCdrom
-        <*> Utils.lookupStack
-        <*> checkFilesM [xdgConfig <</> "tmux" </> "tmux.conf"]
-        <*> Utils.lookupFzfBashrc
-  where
-    mkContext currentOs hostname home (userBinDir, userBinDir')
-      (userLocalBinDir, userLocalBinDir') haveSudo haveVim haveNeovim
-      haveMplayer haveXpdfCompat haveColorDiff haveScreen haveTmux
-      haveDircolors haveXinput haveGit lesspipeCommand bashCompletionScript
-      gitPromptScript userDircolors haveCdrom stackBin tmuxConfig fzfBashrc =
-        Context
-            { hostname
-            , currentOs
-            , haveTouchpad = False -- TODO
-                -- $ grep "^N: Name=.* Touchpad" /proc/bus/input/devices
-                -- N: Name="ELAN1200:00 04F3:3059 Touchpad"
-            , haveSudo
-            , haveMplayer
-            , haveXpdfCompat
-            , haveColorDiff
-            , haveScreen
-            , haveTmux
-            , haveNeovim
-            , haveVim
-            , haveDircolors
-            , haveXinput
-            , haveCdrom
-            , haveGit
-            , canCloseCdrom = False -- TODO
-            , home
-            , userBinDir
-            , userBinDir'
-            , userLocalBinDir
-            , userLocalBinDir'
-            , bashCompletionScript
-            , gitPromptScript
-            , userDircolors
-            , lesspipeCommand
-            , stackBin
-            , tmuxConfig
-            , fzfBashrc
-            }
+    currentOs <- SystemInfo.detectOs
+    hostname <- getHostName
+    home <- getHomeDirectory
+    (userBinDir, userBinDir') <- (Home ?<</> "bin")
+    (userLocalBinDir, userLocalBinDir') <- (DotLocal ?<</> "bin")
+    haveSudo <- haveExecutable "sudo"
+    haveVim <- haveExecutable "vim"
+    haveNeovim <- haveExecutable "nvim"
+    haveMplayer <- haveExecutable "mplayer"
+    haveXpdfCompat <- haveXpdfCompatExecutable
+    haveColorDiff <- haveExecutable "colordiff"
+    haveScreen <- haveExecutable "screen"
+    haveTmux <- haveExecutable "tmux"
+    haveDircolors <- haveExecutable "dircolors"
+    haveXinput <- haveExecutable "xinput"
+    haveGit <- haveExecutable "git"
+    lesspipeCommand <- Utils.lookupLesspipeCommand
+    bashCompletionScript <- Utils.lookupBashCompletionScript
+    gitPromptScript <- Utils.lookupGitPromptScript currentOs
+    userDircolors <- checkFilesM [Home <</> ".dircolors"]
+    haveCdrom <- SystemInfo.haveCdrom
+    stackBin <- Utils.lookupStack
+    tmuxConfig <- checkFilesM [xdgConfig <</> "tmux" </> "tmux.conf"]
+    fzfBashrc <- Utils.lookupFzfBashrc
 
+    pure Context
+        { hostname
+        , currentOs
+        , haveTouchpad = False -- TODO
+            -- $ grep "^N: Name=.* Touchpad" /proc/bus/input/devices
+            -- N: Name="ELAN1200:00 04F3:3059 Touchpad"
+        , haveSudo
+        , haveMplayer
+        , haveXpdfCompat
+        , haveColorDiff
+        , haveScreen
+        , haveTmux
+        , haveNeovim
+        , haveVim
+        , haveDircolors
+        , haveXinput
+        , haveCdrom
+        , haveGit
+        , canCloseCdrom = False -- TODO
+        , home
+        , userBinDir
+        , userBinDir'
+        , userLocalBinDir
+        , userLocalBinDir'
+        , bashCompletionScript
+        , gitPromptScript
+        , userDircolors
+        , lesspipeCommand
+        , stackBin
+        , tmuxConfig
+        , fzfBashrc
+        }
+  where
     orA = liftA2 (||)
 
-    doesUserHaveXpdfCompat = isJust <$> checkFilesM
-        [ Home <</> "bin" </> "xpdf-compat"
-        , DotLocal <</> "bin" </> "xpdf-compat"
-        ]
+    haveXpdfCompatExecutable = haveExecutable "xpdf-compat"
+        `orA`
+            ( isJust <$> checkFilesM
+                [ Home <</> "bin" </> "xpdf-compat"
+                , DotLocal <</> "bin" </> "xpdf-compat"
+                ]
+            )
 
 vimAliasForNeovim :: Context -> Bash ()
 vimAliasForNeovim Context{haveNeovim} = when haveNeovim $ alias "vim" "nvim"
@@ -221,16 +218,6 @@ setPrompt Context{..} = do
     screenPs1 = if haveScreen then "$(__screen_ps1)" else ""
     gitPs1 = if haveGit && isJust gitPromptScript then "$(__git_ps1)" else ""
 
-editor :: Context -> Bash ()
-editor Context{..} = asum
-    [ do
-        guard haveNeovim
-        setEditor "nvim"
-    , do
-        guard haveVim
-        setEditor "vim"
-    ]
-
 -- Ideas:
 --
 -- * Run this application as a service. Output must be made available to Bash
@@ -280,7 +267,10 @@ main' writeOutput = do
 
         setPrompt ctx
 
-        editor ctx
+        editor
+            [ if haveNeovim then Just "nvim" else Nothing
+            , if haveVim then Just "vim" else Nothing
+            ]
 
         aliases ctx
 

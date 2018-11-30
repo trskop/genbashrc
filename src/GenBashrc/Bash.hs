@@ -40,7 +40,7 @@ import Data.Function (($), (.), flip, id)
 import Data.Functor (Functor, (<$))
 import qualified Data.List as List (break, intersperse, map, nub)
 import Data.Maybe (Maybe(Just, Nothing), fromMaybe, maybe)
-import Data.Monoid (Monoid(mempty, mappend), (<>), mconcat)
+import Data.Monoid (Alt(Alt, getAlt), Monoid(mempty, mappend), (<>), mconcat)
 import Data.Ord (Ord)
 import Data.Proxy (Proxy)
 import Data.Semigroup (Semigroup)
@@ -561,12 +561,18 @@ exportPath = export "PATH" Nothing
 evalLesspipe :: CommandName -> Bash ()
 evalLesspipe c = eval' $ "\"$(SHELL=/bin/sh " <> c <> ")\""
 
+-- | Set @EDITOR@ and @VISUAL@ environment variables to specified values.
 setEditor :: BashString -> Bash ()
 setEditor e = do
     set "EDITOR" e
     export "EDITOR" Nothing
     set "VISUAL" e
     export "VISUAL" Nothing
+
+-- | Set @EDITOR@ and @VISUAL@ environment variables to first non-@Nothing@
+-- value.
+editor :: [Maybe BashString] -> Bash ()
+editor  = getAlt . foldMap (maybe mempty $ Alt . setEditor)
 
 withDircollorsWhen :: Bool -> Maybe FilePath -> Bash () -> Bash ()
 withDircollorsWhen condition userDircolors actions = when condition $ do
