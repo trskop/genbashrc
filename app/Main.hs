@@ -71,6 +71,7 @@ data Context = Context
     , lesspipeCommand :: Maybe CommandName
     , stackBin :: Maybe FilePath
     , tmuxConfig :: Maybe FilePath
+    , fzfBashrc :: Maybe FilePath
     }
   deriving (Eq, Show)
 
@@ -100,41 +101,44 @@ context = do
         <*> SystemInfo.haveCdrom
         <*> Utils.lookupStack
         <*> checkFilesM [xdgConfig <</> "tmux" </> "tmux.conf"]
+        <*> Utils.lookupFzfBashrc
   where
-    mkContext os hn homeDir (binDir, binDir') (localBinDir, localBinDir') sudo
-      vim neovim mplayer xpdfCompat colordiff screen tmux dircolors xinput git
-      lesspipe' bashCompletionScript' gitPromptScript' userDircolors'
-      haveCdrom stack xdgTmuxConfig =
+    mkContext currentOs hostname home (userBinDir, userBinDir')
+      (userLocalBinDir, userLocalBinDir') haveSudo haveVim haveNeovim
+      haveMplayer haveXpdfCompat haveColorDiff haveScreen haveTmux
+      haveDircolors haveXinput haveGit lesspipeCommand bashCompletionScript
+      gitPromptScript userDircolors haveCdrom stackBin tmuxConfig fzfBashrc =
         Context
-            { hostname = hn
-            , currentOs = os
+            { hostname
+            , currentOs
             , haveTouchpad = False -- TODO
                 -- $ grep "^N: Name=.* Touchpad" /proc/bus/input/devices
                 -- N: Name="ELAN1200:00 04F3:3059 Touchpad"
-            , haveSudo = sudo
-            , haveMplayer = mplayer
-            , haveXpdfCompat = xpdfCompat
-            , haveColorDiff = colordiff
-            , haveScreen = screen
-            , haveTmux = tmux
-            , haveNeovim = neovim
-            , haveVim = vim
-            , haveDircolors = dircolors
-            , haveXinput = xinput
-            , haveCdrom = haveCdrom
-            , haveGit = git
+            , haveSudo
+            , haveMplayer
+            , haveXpdfCompat
+            , haveColorDiff
+            , haveScreen
+            , haveTmux
+            , haveNeovim
+            , haveVim
+            , haveDircolors
+            , haveXinput
+            , haveCdrom
+            , haveGit
             , canCloseCdrom = False -- TODO
-            , home = homeDir
-            , userBinDir = binDir
-            , userBinDir' = binDir'
-            , userLocalBinDir = localBinDir
-            , userLocalBinDir' = localBinDir'
-            , bashCompletionScript = bashCompletionScript'
-            , gitPromptScript = gitPromptScript'
-            , userDircolors = userDircolors'
-            , lesspipeCommand = lesspipe'
-            , stackBin = stack
-            , tmuxConfig = xdgTmuxConfig
+            , home
+            , userBinDir
+            , userBinDir'
+            , userLocalBinDir
+            , userLocalBinDir'
+            , bashCompletionScript
+            , gitPromptScript
+            , userDircolors
+            , lesspipeCommand
+            , stackBin
+            , tmuxConfig
+            , fzfBashrc
             }
 
     orA = liftA2 (||)
@@ -288,6 +292,8 @@ main' writeOutput = do
                         Utils.stackBashCompletion
 
         when haveGit $ onJust gitPromptScript source
+
+        Utils.fzfConfig fzfBashrc
 
 onJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
 onJust = for_

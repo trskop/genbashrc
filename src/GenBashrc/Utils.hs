@@ -33,6 +33,10 @@ module GenBashrc.Utils
     -- | Haskell build tool Stack.
     , lookupStack
     , stackBashCompletion
+
+    -- * FZF
+    , lookupFzfBashrc
+    , fzfConfig
     )
   where
 
@@ -40,6 +44,7 @@ import Control.Applicative (pure)
 import Control.Monad ((>>=), when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Bool (Bool, bool)
+import Data.Foldable (for_)
 import Data.Function (($), (.))
 import Data.Functor ((<$>))
 import Data.Maybe (Maybe(Just, Nothing), maybe)
@@ -49,7 +54,14 @@ import System.IO (FilePath)
 import System.Directory (findExecutable)
 import System.FilePath ((</>))
 
-import GenBashrc.Bash (Bash, CommandName, alias, eval, withDircollorsWhen)
+import GenBashrc.Bash
+    ( Bash
+    , CommandName
+    , alias
+    , eval
+    , source_
+    , withDircollorsWhen
+    )
 import GenBashrc.Os (OsInfo(Linux, MacOs), linux, macOs, whenOs_)
 import GenBashrc.FilePath
     ( UserDirectory(DotLocal, Home)
@@ -57,6 +69,7 @@ import GenBashrc.FilePath
     , checkFiles
     , checkFilesM
     , haveExecutable
+    , xdgConfig
     )
 
 
@@ -104,6 +117,21 @@ stackBashCompletion :: Bash ()
 stackBashCompletion = eval "\"$(stack --bash-completion-script stack)\""
 
 -- }}} Stack ------------------------------------------------------------------
+
+-- {{{ FZF --------------------------------------------------------------------
+
+lookupFzfBashrc :: MonadIO io => io (Maybe FilePath)
+lookupFzfBashrc = checkFilesM
+    [ xdgConfig <</> "fzf" </> "fzf.bash"
+    , Home <</> ".fzf.bash"
+    ]
+
+fzfConfig :: Maybe FilePath -> Bash ()
+fzfConfig possiblyFzfBashrc = for_ possiblyFzfBashrc $ \fzfBashrc -> do
+    () <- source_ fzfBashrc
+    pure ()
+
+-- }}} FZF --------------------------------------------------------------------
 
 -- {{{ Aliases ----------------------------------------------------------------
 
