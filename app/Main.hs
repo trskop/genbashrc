@@ -43,6 +43,25 @@ import qualified GenBashrc.Utils as Utils
 --import Debug.Trace (traceShowId)
 
 
+-- Ideas:
+--
+-- * Run this application as a service. Output must be made available to Bash
+--   atomically.
+-- * Track dependencies and only when something changes produce new output.
+-- * Track changes in genbashrc so that output is recompiled when new version
+--   is deployed.
+
+main :: IO ()
+main = getArgs >>= \case
+    [] -> main' Lazy.Text.putStr
+    [outputFileName] ->
+        -- TODO: Make output writing an atomic operation.
+        main' $ Lazy.Text.writeFile outputFileName
+    _ -> error "Too many arguments."
+
+main' :: (Lazy.Text -> IO a) -> IO a
+main' writeOutput = context >>= writeOutput . genBash . bashrc
+
 data Context = Context
     { currentOs :: OsInfo
     , hostname :: HostName
@@ -63,8 +82,10 @@ data Context = Context
     , home :: FilePath
     , userBinDir :: Maybe FilePath
     , userBinDir' :: FilePath
+    , userBinDirInPath :: Bool
     , userLocalBinDir :: Maybe FilePath
     , userLocalBinDir' :: FilePath
+    , userLocalBinDirInPath :: Bool
     , bashCompletionScript :: Maybe FilePath
     , gitPromptScript :: Maybe FilePath
     , userDircolors :: Maybe FilePath
@@ -81,7 +102,9 @@ context = do
     hostname <- getHostName
     home <- getHomeDirectory
     (userBinDir, userBinDir') <- (Home ?<</> "bin")
+    userBinDirInPath <- dirInPath userBinDir'
     (userLocalBinDir, userLocalBinDir') <- (DotLocal ?<</> "bin")
+    userLocalBinDirInPath <- dirInPath userLocalBinDir'
     haveSudo <- haveExecutable "sudo"
     haveVim <- haveExecutable "vim"
     haveNeovim <- haveExecutable "nvim"
@@ -124,8 +147,10 @@ context = do
         , home
         , userBinDir
         , userBinDir'
+        , userBinDirInPath
         , userLocalBinDir
         , userLocalBinDir'
+        , userLocalBinDirInPath
         , bashCompletionScript
         , gitPromptScript
         , userDircolors
@@ -145,17 +170,13 @@ context = do
                 ]
             )
 
-vimAliasForNeovim :: Context -> Bash ()
-vimAliasForNeovim Context{haveNeovim} = when haveNeovim $ alias "vim" "nvim"
-    -- TODO: Consider using full path to neovim binary.
-
 aliases :: Context -> Bash ()
-aliases ctx@Context{..} = do
+aliases Context{..} = do
     Utils.standardAliases Utils.AliasOptions{..}
 
     whenOs linux currentOs $ \linuxOs -> do
         Linux.whenDistro_ Linux.notDebianCompat linuxOs
-            $ vimAliasForNeovim ctx
+            vimAliasForNeovim
 
         whenPackageManager_ Linux.apt linuxOs $ do
             alias "apt-get" "'sudo apt-get'"
@@ -171,7 +192,7 @@ aliases ctx@Context{..} = do
             unless canCloseCdrom $ alias "close" "eject -d -t"
 
     whenOs_ macOs currentOs
-        $ vimAliasForNeovim ctx
+        vimAliasForNeovim
 
     alias "evil" $ if haveSudo then "'sudo su -'" else "'su -'"
 
@@ -185,6 +206,9 @@ aliases ctx@Context{..} = do
             <> "'"
 
     alias "term-title" "'printf \"\\033]2;%s\\007\"'"
+  where
+    vimAliasForNeovim = when haveNeovim $ alias "vim" "nvim"
+
 
 history :: Context -> Bash ()
 history _ = do
@@ -218,72 +242,52 @@ setPrompt Context{..} = do
     screenPs1 = if haveScreen then "$(__screen_ps1)" else ""
     gitPs1 = if haveGit && isJust gitPromptScript then "$(__git_ps1)" else ""
 
--- Ideas:
---
--- * Run this application as a service. Output must be made available to Bash
---   atomically.
--- * Track dependencies and only when something changes produce new output.
--- * Track changes in genbashrc so that output is recompiled when new version
---   is deployed.
+bashrc :: Context -> Bash ()
+bashrc ctx@Context{..} = do
+    -- Report job state changes immediately and don't wait for printing new
+    -- prompt.
+    shopt Set NotifyOfJobTerminationImmediately
 
-main :: IO ()
-main = getArgs >>= \case
-    [] -> main' Lazy.Text.putStr
-    [outputFileName] ->
-        -- TODO: Make output writing an atomic operation.
-        main' $ Lazy.Text.writeFile outputFileName
-    _ -> error "Too many arguments."
+    -- Turn on vi-style line editing interface.
+    shopt Set Vi
 
-main' :: (Lazy.Text -> IO a) -> IO a
-main' writeOutput = do
-    ctx@Context{..} <- context
-    userBinDirInPath <- dirInPath userBinDir'
-    userLocalBinDirInPath <- dirInPath userLocalBinDir'
-    writeOutput . genBash $ do
-        -- Report job state changes immediately and don't wait for printing new
-        -- prompt.
-        shopt Set NotifyOfJobTerminationImmediately
+    -- Use visible bell (if available) instead of audible, which is the
+    -- default.
+    line @Text "set bell-style visible"
 
-        -- Turn on vi-style line editing interface.
-        shopt Set Vi
+    -- Check the window size after each command and, if necessary, update the
+    -- values of LINES and COLUMNS.
+    shopt Set Checkwinsize
 
-        -- Use visible bell (if available) instead of audible, which is the
-        -- default.
-        line @Text "set bell-style visible"
+    history ctx
 
-        -- Check the window size after each command and, if necessary, update
-        -- the values of LINES and COLUMNS.
-        shopt Set Checkwinsize
+    onJust lesspipeCommand evalLesspipe
 
-        history ctx
+    pathUpdated <- updatePath Prepend $ PathElements
+        [ guard (not userBinDirInPath) *> userBinDir
+        , guard (not userLocalBinDirInPath) *> userLocalBinDir
+        ]
+    exportPathIf pathUpdated
 
-        onJust lesspipeCommand evalLesspipe
+    setPrompt ctx
 
-        pathUpdated <- updatePath Prepend $ PathElements
-            [ guard (not userBinDirInPath) *> userBinDir
-            , guard (not userLocalBinDirInPath) *> userLocalBinDir
-            ]
-        exportPathIf pathUpdated
+    editor
+        [ guard haveNeovim *> Just "nvim"
+        , guard haveVim *> Just "vim"
+        ]
 
-        setPrompt ctx
+    aliases ctx
 
-        editor
-            [ if haveNeovim then Just "nvim" else Nothing
-            , if haveVim then Just "vim" else Nothing
-            ]
+    onJust bashCompletionScript $ \script ->
+        bashIfThen "! shopt -oq posix" $ do
+            () <- source_ script
+            onJust stackBin $ \stack ->
+                when ((stack `isInDir` home) || (macOs `isOs` currentOs))
+                    Utils.stackBashCompletion
 
-        aliases ctx
+    when haveGit $ onJust gitPromptScript source
 
-        onJust bashCompletionScript $ \script ->
-            bashIfThen "! shopt -oq posix" $ do
-                () <- source_ script
-                onJust stackBin $ \stack ->
-                    when ((stack `isInDir` home) || (macOs `isOs` currentOs))
-                        Utils.stackBashCompletion
-
-        when haveGit $ onJust gitPromptScript source
-
-        Utils.fzfConfig fzfBashrc
+    Utils.fzfConfig fzfBashrc
 
 onJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
 onJust = for_
