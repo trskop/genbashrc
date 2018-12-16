@@ -43,13 +43,14 @@ import qualified GenBashrc.Utils as Utils
 --import Debug.Trace (traceShowId)
 
 
--- Ideas:
+-- TODO:
 --
--- * Run this application as a service. Output must be made available to Bash
---   atomically.
 -- * Track dependencies and only when something changes produce new output.
+--   This could be done by Shake and its Oracle functionality.
 -- * Track changes in genbashrc so that output is recompiled when new version
 --   is deployed.
+-- * Introduce Dhall configuration file so that some tweaks can be done without
+--   the need of modifying this file.
 
 main :: IO ()
 main = getArgs >>= \case

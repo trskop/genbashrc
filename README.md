@@ -35,7 +35,7 @@ stack install
 
 ## Usage
 
-Generate `.bashrc_generated` optimised for current machine and source it:
+Generate `.bashrc` optimised for current machine and source it:
 
 ```Bash
 cp ~/.bashrc{,~}
@@ -48,7 +48,6 @@ case $- in
       *) return;;
 esac
 
-[ -x ~/.local/bin/genbashrc ] && ~/.local/bin/genbashrc ~/.bashrc_generated
-[ -r ~/.bashrc_generated ] && . ~/.bashrc_generated
+[[ -x "$HOME/.local/bin/genbashrc" ]] && source <("$HOME/.local/bin/genbashrc")
 EOF
 ```
