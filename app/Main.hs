@@ -94,6 +94,7 @@ data Context = Context
     , stackBin :: Maybe FilePath
     , tmuxConfig :: Maybe FilePath
     , fzfBashrc :: Maybe FilePath
+    , yx :: Maybe FilePath
     }
   deriving (Eq, Show)
 
@@ -125,6 +126,7 @@ context = do
     stackBin <- Utils.lookupStack
     tmuxConfig <- checkFilesM [xdgConfig <</> "tmux" </> "tmux.conf"]
     fzfBashrc <- Utils.lookupFzfBashrc
+    yx <- checkFilesM [Home <</> "bin" </> "yx"]
 
     pure Context
         { hostname
@@ -159,6 +161,7 @@ context = do
         , stackBin
         , tmuxConfig
         , fzfBashrc
+        , yx
         }
   where
     orA = liftA2 (||)
@@ -289,6 +292,9 @@ bashrc ctx@Context{..} = do
     when haveGit $ onJust gitPromptScript source
 
     Utils.fzfConfig fzfBashrc
+
+    when (isJust yx) $ do
+        line @Text "bind '\"\\C-f\":\"yx cd\n\"'"
 
 onJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
 onJust = for_
