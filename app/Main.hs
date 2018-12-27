@@ -293,8 +293,9 @@ bashrc ctx@Context{..} = do
 
     Utils.fzfConfig fzfBashrc
 
-    when (isJust yx) $ do
-        line @Text "bind '\"\\C-f\":\"yx cd\n\"'"
+    onJust yx $ \yxBin -> do
+        () <- source_ ("<(" <> fromString yxBin <> " env --script)" :: Text)
+        line @Text ("bind '\"\\C-f\":\"" <> fromString yxBin <> " cd\\n\"'")
 
 onJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
 onJust = for_
