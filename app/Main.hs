@@ -95,6 +95,7 @@ data Context = Context
     , tmuxConfig :: Maybe FilePath
     , fzfBashrc :: Maybe FilePath
     , yx :: Maybe FilePath
+    , nixProfile :: Maybe FilePath
     }
   deriving (Eq, Show)
 
@@ -127,6 +128,7 @@ context = do
     tmuxConfig <- checkFilesM [xdgConfig <</> "tmux" </> "tmux.conf"]
     fzfBashrc <- Utils.lookupFzfBashrc
     yx <- checkFilesM [Home <</> "bin" </> "yx"]
+    nixProfile <- checkFilesM [Home <</> ".nix-profile/etc/profile.d/nix.sh"]
 
     pure Context
         { hostname
@@ -162,6 +164,7 @@ context = do
         , tmuxConfig
         , fzfBashrc
         , yx
+        , nixProfile
         }
   where
     orA = liftA2 (||)
@@ -212,7 +215,6 @@ aliases Context{..} = do
     alias "term-title" "'printf \"\\033]2;%s\\007\"'"
   where
     vimAliasForNeovim = when haveNeovim $ alias "vim" "nvim"
-
 
 history :: Context -> Bash ()
 history _ = do
@@ -296,6 +298,8 @@ bashrc ctx@Context{..} = do
     onJust yx $ \yxBin -> do
         () <- source_ ("<(" <> fromString yxBin <> " env --script)" :: Text)
         line @Text ("bind '\"\\C-f\":\"" <> fromString yxBin <> " cd\\n\"'")
+
+    onJust nixProfile source_
 
 onJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
 onJust = for_
