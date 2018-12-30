@@ -12,16 +12,16 @@ import Prelude (error)
 
 import Control.Applicative (Applicative, (*>), liftA2, pure)
 import Control.Monad ((>>=), guard, unless, when)
-import Data.Bool (Bool(False), (&&), (||), not)
+import Data.Bool (Bool(False, True), (&&), (||), not)
 import Data.Eq (Eq)
 import Data.Foldable (for_)
-import Data.Function (($), (.))
+import Data.Function (($), (.), const)
 import Data.Functor ((<$>))
 import Data.Maybe (Maybe(Just, Nothing), isJust, maybe)
 import Data.Monoid (Monoid, (<>), mempty)
 import Data.Proxy (Proxy(Proxy))
 import Data.String (fromString)
-import System.Environment (getArgs)
+import System.Environment (getArgs, lookupEnv)
 import System.IO (FilePath, IO)
 import Text.Show (Show)
 
@@ -47,8 +47,7 @@ import qualified GenBashrc.Utils as Utils
 --
 -- * Track dependencies and only when something changes produce new output.
 --   This could be done by Shake and its Oracle functionality.
--- * Track changes in genbashrc so that output is recompiled when new version
---   is deployed.
+--
 -- * Introduce Dhall configuration file so that some tweaks can be done without
 --   the need of modifying this file.
 
@@ -96,6 +95,7 @@ data Context = Context
     , fzfBashrc :: Maybe FilePath
     , yx :: Maybe FilePath
     , nixProfile :: Maybe FilePath
+    , nixProfileSourced :: Bool
     , haveDirenv :: Bool
     }
   deriving (Eq, Show)
@@ -130,6 +130,7 @@ context = do
     fzfBashrc <- Utils.lookupFzfBashrc
     yx <- checkFilesM [Home <</> "bin" </> "yx"]
     nixProfile <- checkFilesM [Home <</> ".nix-profile/etc/profile.d/nix.sh"]
+    nixProfileSourced <- maybe False (const True) <$> lookupEnv "NIX_PATH"
     haveDirenv <- haveExecutable "direnv"
 
     pure Context
@@ -167,6 +168,7 @@ context = do
         , fzfBashrc
         , yx
         , nixProfile
+        , nixProfileSourced
         , haveDirenv
         }
   where
@@ -321,7 +323,8 @@ bashrc ctx@Context{..} = do
     when haveDirenv
         $ source_ ("<(direnv hook bash)" :: Text)
 
-    onJust nixProfile source_
+    unless (nixProfileSourced)
+        $ onJust nixProfile source_
 
 onJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
 onJust = for_
