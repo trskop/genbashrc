@@ -18,7 +18,7 @@ import Data.Foldable (for_)
 import Data.Function (($), (.))
 import Data.Functor ((<$>))
 import Data.Maybe (Maybe(Just, Nothing), isJust, maybe)
-import Data.Monoid ((<>))
+import Data.Monoid (Monoid, (<>), mempty)
 import Data.Proxy (Proxy(Proxy))
 import Data.String (fromString)
 import System.Environment (getArgs)
@@ -96,6 +96,7 @@ data Context = Context
     , fzfBashrc :: Maybe FilePath
     , yx :: Maybe FilePath
     , nixProfile :: Maybe FilePath
+    , haveDirenv :: Bool
     }
   deriving (Eq, Show)
 
@@ -129,6 +130,7 @@ context = do
     fzfBashrc <- Utils.lookupFzfBashrc
     yx <- checkFilesM [Home <</> "bin" </> "yx"]
     nixProfile <- checkFilesM [Home <</> ".nix-profile/etc/profile.d/nix.sh"]
+    haveDirenv <- haveExecutable "direnv"
 
     pure Context
         { hostname
@@ -165,6 +167,7 @@ context = do
         , fzfBashrc
         , yx
         , nixProfile
+        , haveDirenv
         }
   where
     orA = liftA2 (||)
@@ -233,20 +236,36 @@ history _ = do
 
 setPrompt :: Context -> Bash ()
 setPrompt Context{..} = do
+    function "__env_ps1" $ do
+        let -- Variable CD_LEVEL indicates how many times we have invoked "yx cd" and
+            -- ended up in a subshell.
+            yxCd = "${CD_LEVEL:+${CD_LEVEL}}"
+
+            -- Variable YX_ENV_DIR indicates that we are in a local environment
+            -- delimited by "$YX_ENV_DIR/.yx-env" file.  Similar thing goes for
+            -- DIRENV_DIR, only the file is named "$DIRENV_DIR/.envrc".
+            yxEnv = "${YX_ENV_DIR:+∃}"
+            direnv = mguard haveDirenv "${DIRENV_DIR:+∃}"
+
+        line @Text ("local x=\"" <> yxCd <> yxEnv <> direnv <> "\"")
+        line @Text ("echo \"${x:+⟦${x}⟧}\"")
+
     when haveScreen
         . function "__screen_ps1"
-            $ line @Text "[[ -n \"${WINDOW}\" ]] && echo \"#${WINDOW}\""
+            $ line @Text "echo \"${WINDOW:+#${WINDOW}}\""
 
     prompt (Proxy @'PS1)
-        $ "'\\[\\e[32m\\][ \\[\\e[37m\\]\\u@\\h"
+        $ "'\\[\\e[90m\\]#\\[\\e[37m\\]\\u@\\h"
         <> screenPs1
-        <> " \\W${CD_LEVEL:+⟨${CD_LEVEL}⟩}"
+        <> " \\W\\[\\e[90m\\]"
         <> gitPs1
-        <> "\\[\\e[32m\\] ]\\$\\[\\e[22;0m\\] '"
+        <> "$(__env_ps1)\\[\\e[32m\\] ⊢\\[\\e[22;0m\\] '"
     exportPrompt (Proxy @'PS1)
   where
-    screenPs1 = if haveScreen then "$(__screen_ps1)" else ""
-    gitPs1 = if haveGit && isJust gitPromptScript then "$(__git_ps1)" else ""
+    screenPs1 = mguard haveScreen "$(__screen_ps1)"
+
+    gitPs1 =
+        mguard (haveGit && isJust gitPromptScript) "$(__git_ps1 \"\57504%s\")"
 
 bashrc :: Context -> Bash ()
 bashrc ctx@Context{..} = do
@@ -299,7 +318,13 @@ bashrc ctx@Context{..} = do
         () <- source_ ("<(" <> fromString yxBin <> " env --script)" :: Text)
         line @Text ("bind '\"\\C-f\":\"" <> fromString yxBin <> " cd\\n\"'")
 
+    when haveDirenv
+        $ source_ ("<(direnv hook bash)" :: Text)
+
     onJust nixProfile source_
 
 onJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
 onJust = for_
+
+mguard :: Monoid a => Bool -> a -> a
+mguard p a = if p then a else mempty
