@@ -241,7 +241,7 @@ setPrompt Context{..} = do
     function "__env_ps1" $ do
         let -- Variable CD_LEVEL indicates how many times we have invoked "yx cd" and
             -- ended up in a subshell.
-            yxCd = "${CD_LEVEL:+${CD_LEVEL}}"
+            yxCd = "${CD_LEVEL:+⟦${CD_LEVEL}⟧}"
 
             -- Variable YX_ENV_DIR indicates that we are in a local environment
             -- delimited by "$YX_ENV_DIR/.yx-env" file.  Similar thing goes for
@@ -249,17 +249,16 @@ setPrompt Context{..} = do
             yxEnv = "${YX_ENV_DIR:+∃}"
             direnv = mguard haveDirenv "${DIRENV_DIR:+∃}"
 
-        line @Text ("local x=\"" <> yxCd <> yxEnv <> direnv <> "\"")
-        line @Text ("echo \"${x:+⟦${x}⟧}\"")
+        line @Text ("echo \"" <> yxCd <> yxEnv <> direnv <> "\"")
 
     when haveScreen
         . function "__screen_ps1"
             $ line @Text "echo \"${WINDOW:+#${WINDOW}}\""
 
     prompt (Proxy @'PS1)
-        $ "'\\[\\e[90m\\]#\\[\\e[37m\\]\\u@\\h"
+        $ "'\\[\\e[90m\\]#\\[\\e[37m\\]\\u\\[\\e[90m\\]@\\[\\e[37m\\]\\h"
         <> screenPs1
-        <> " \\W\\[\\e[90m\\]"
+        <> "\\[\\e[90m\\]:\\[\\e[37m\\]\\W\\[\\e[90m\\]"
         <> gitPs1
         <> "$(__env_ps1)\\[\\e[32m\\] ⊢\\[\\e[22;0m\\] '"
     exportPrompt (Proxy @'PS1)
