@@ -218,6 +218,7 @@ aliases Context{..} = do
         whenPackageManager_ Linux.apt linuxOs $ do
             alias "apt-get" "'sudo apt-get'"
             alias "apt"     "'sudo apt'"
+            alias "this"    "'yx this'"
 
         when (haveTouchpad && haveXinput) $ do
             -- TODO: Rewrite following to use xinput.
