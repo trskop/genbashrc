@@ -46,7 +46,8 @@ import qualified GenBashrc.Utils as Utils
 -- TODO:
 --
 -- * Track dependencies and only when something changes produce new output.
---   This could be done by Shake and its Oracle functionality.
+--   This could be done by Shake and its Oracle functionality.  Think of this
+--   as having a cache for 'Context'.
 --
 -- * Introduce Dhall configuration file so that some tweaks can be done without
 --   the need of modifying this file.
@@ -62,6 +63,11 @@ main = getArgs >>= \case
 main' :: (Lazy.Text -> IO a) -> IO a
 main' writeOutput = context >>= writeOutput . genBash . bashrc
 
+-- | All the information we gathered from the system and users environment.
+--
+-- TODO: Split into multiple data types and provide smart constructor for
+-- those.  E.g. data type 'Editors' that contains information about known
+-- editors.
 data Context = Context
     { currentOs :: OsInfo
     , hostname :: HostName
@@ -93,6 +99,7 @@ data Context = Context
     , stackBin :: Maybe FilePath
     , tmuxConfig :: Maybe FilePath
     , fzfBashrc :: Maybe FilePath
+    , fzfAlreadyLoaded :: Bool
     , yx :: Maybe FilePath
     , nixProfile :: Maybe FilePath
     , nixProfileSourced :: Bool
@@ -116,7 +123,6 @@ context = do
     haveXpdfCompat <- haveXpdfCompatExecutable
     haveColorDiff <- haveExecutable "colordiff"
     haveScreen <- haveExecutable "screen"
-    haveTmux <- haveExecutable "tmux"
     haveDircolors <- haveExecutable "dircolors"
     haveXinput <- haveExecutable "xinput"
     haveGit <- haveExecutable "git"
@@ -126,11 +132,29 @@ context = do
     userDircolors <- checkFilesM [Home <</> ".dircolors"]
     haveCdrom <- SystemInfo.haveCdrom
     stackBin <- Utils.lookupStack
+
+    -- Tmux doesn't support XDG Base Directory Specification.  This is used to
+    -- work around it.
     tmuxConfig <- checkFilesM [xdgConfig <</> "tmux" </> "tmux.conf"]
+    haveTmux <- haveExecutable "tmux"
+
     fzfBashrc <- Utils.lookupFzfBashrc
+    fzfAlreadyLoaded <- maybe False (const True)
+        <$> lookupEnv "_fzf_completion_loader"
+        -- Variable _fzf_completion_loader is defined by FZF Bash completion.
+        -- It's not foolproof, but if it's defined then we can be sure that we
+        -- don't need to reload FZF shell script again.
+
     yx <- checkFilesM [Home <</> "bin" </> "yx"]
+
+    -- This needs testing.  We need to make sure that Nix works as expected,
+    -- however we don't want it to be too pervasive.
     nixProfile <- checkFilesM [Home <</> ".nix-profile/etc/profile.d/nix.sh"]
     nixProfileSourced <- maybe False (const True) <$> lookupEnv "NIX_PATH"
+
+    -- Direnv is an environment switcher for the shell. This allows
+    -- project-specific environment variables without cluttering the
+    -- '~/.profile' file.  <https://direnv.net/>
     haveDirenv <- haveExecutable "direnv"
 
     pure Context
@@ -166,6 +190,7 @@ context = do
         , stackBin
         , tmuxConfig
         , fzfBashrc
+        , fzfAlreadyLoaded
         , yx
         , nixProfile
         , nixProfileSourced
@@ -200,8 +225,8 @@ aliases Context{..} = do
             alias "touchpad-on"  "'synclient TouchpadOff=0'"
 
         when haveCdrom $ do
-            alias "eject" "eject -d"
-            unless canCloseCdrom $ alias "close" "eject -d -t"
+            alias "'eject" "eject -d'"
+            unless canCloseCdrom $ alias "close" "'eject -d -t'"
 
     whenOs_ macOs currentOs
         vimAliasForNeovim
@@ -313,7 +338,8 @@ bashrc ctx@Context{..} = do
 
     when haveGit $ onJust gitPromptScript source
 
-    Utils.fzfConfig fzfBashrc
+    unless fzfAlreadyLoaded
+        $ Utils.fzfConfig fzfBashrc
 
     onJust yx $ \yxBin -> do
         () <- source_ ("<(" <> fromString yxBin <> " env --script)" :: Text)
