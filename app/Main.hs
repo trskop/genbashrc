@@ -12,10 +12,10 @@ import Prelude (error)
 
 import Control.Applicative (Applicative, (*>), liftA2, pure)
 import Control.Monad ((>>=), guard, unless, when)
-import Data.Bool (Bool(False, True), (&&), (||), not)
+import Data.Bool (Bool(False), (&&), (||), not)
 import Data.Eq (Eq)
 import Data.Foldable (for_)
-import Data.Function (($), (.), const)
+import Data.Function (($), (.))
 import Data.Functor ((<$>))
 import Data.Maybe (Maybe(Just, Nothing), isJust, maybe)
 import Data.Monoid (Monoid, (<>), mempty)
@@ -112,9 +112,9 @@ context = do
     currentOs <- SystemInfo.detectOs
     hostname <- getHostName
     home <- getHomeDirectory
-    (userBinDir, userBinDir') <- (Home ?<</> "bin")
+    (userBinDir, userBinDir') <- Home ?<</> "bin"
     userBinDirInPath <- dirInPath userBinDir'
-    (userLocalBinDir, userLocalBinDir') <- (DotLocal ?<</> "bin")
+    (userLocalBinDir, userLocalBinDir') <- DotLocal ?<</> "bin"
     userLocalBinDirInPath <- dirInPath userLocalBinDir'
     haveSudo <- haveExecutable "sudo"
     haveVim <- haveExecutable "vim"
@@ -139,8 +139,7 @@ context = do
     haveTmux <- haveExecutable "tmux"
 
     fzfBashrc <- Utils.lookupFzfBashrc
-    fzfAlreadyLoaded <- maybe False (const True)
-        <$> lookupEnv "_fzf_completion_loader"
+    fzfAlreadyLoaded <- isJust <$> lookupEnv "_fzf_completion_loader"
         -- Variable _fzf_completion_loader is defined by FZF Bash completion.
         -- It's not foolproof, but if it's defined then we can be sure that we
         -- don't need to reload FZF shell script again.
@@ -150,7 +149,7 @@ context = do
     -- This needs testing.  We need to make sure that Nix works as expected,
     -- however we don't want it to be too pervasive.
     nixProfile <- checkFilesM [Home <</> ".nix-profile/etc/profile.d/nix.sh"]
-    nixProfileSourced <- maybe False (const True) <$> lookupEnv "NIX_PATH"
+    nixProfileSourced <- isJust <$> lookupEnv "NIX_PATH"
 
     -- Direnv is an environment switcher for the shell. This allows
     -- project-specific environment variables without cluttering the
@@ -277,19 +276,38 @@ setPrompt Context{..} = do
 
         line @Text ("echo \"" <> yxCd <> yxEnv <> direnv <> "\"")
 
+    when (isJust nixProfile) $ do
+        function "__nix_shell_ps1"
+            $ line @Text "echo \"${IN_NIX_SHELL:+⟪nix⟫}\""
+
+        function "__restore_original_ps1"
+            . bashIfThen "[[ \"${PS1}\" != \"${ORIGINAL_PS1}\" ]]"
+                $ set "PS1" "\"${ORIGINAL_PS1}\""
+
+        bashIfThen "[[ ! \"${PROMPT_COMMAND}\" =~ \"__restore_original_ps1\" ]]"
+            $ set "PROMPT_COMMAND"
+                "\"__restore_original_ps1${PROMPT_COMMAND:+;${PROMPT_COMMAND}}\""
+
     when haveScreen
         . function "__screen_ps1"
             $ line @Text "echo \"${WINDOW:+#${WINDOW}}\""
 
     prompt (Proxy @'PS1)
-        $ "'\\[\\e[90m\\]#\\[\\e[37m\\]\\u\\[\\e[90m\\]@\\[\\e[37m\\]\\h"
+        $ "'\\[\\e[90m\\]#"
+        <> nixShellPs1
+        <> "\\[\\e[37m\\]\\u\\[\\e[90m\\]@\\[\\e[37m\\]\\h"
         <> screenPs1
         <> "\\[\\e[90m\\]:\\[\\e[37m\\]\\W\\[\\e[90m\\]"
         <> gitPs1
         <> "$(__env_ps1)\\[\\e[32m\\] ⊢\\[\\e[22;0m\\] '"
+
     exportPrompt (Proxy @'PS1)
+
+    set "ORIGINAL_PS1" "\"${PS1}\""
   where
     screenPs1 = mguard haveScreen "$(__screen_ps1)"
+
+    nixShellPs1 = mguard (isJust nixProfile) "\\[\\e[32m\\]$(__nix_shell_ps1)"
 
     gitPs1 =
         mguard (haveGit && isJust gitPromptScript) "$(__git_ps1 \"\57504%s\")"
@@ -349,7 +367,7 @@ bashrc ctx@Context{..} = do
     when haveDirenv
         $ source_ ("<(direnv hook bash)" :: Text)
 
-    unless (nixProfileSourced)
+    unless nixProfileSourced
         $ onJust nixProfile source_
 
 onJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
