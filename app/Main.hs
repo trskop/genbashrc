@@ -20,7 +20,7 @@ import Data.Functor ((<$>))
 import Data.Maybe (Maybe(Just, Nothing), isJust, maybe)
 import Data.Monoid (Monoid, (<>), mempty)
 import Data.Proxy (Proxy(Proxy))
-import Data.String (fromString)
+import Data.String (String, fromString)
 import System.Environment (getArgs, lookupEnv)
 import System.IO (FilePath, IO)
 import Text.Show (Show)
@@ -100,6 +100,7 @@ data Context = Context
     , tmuxConfig :: Maybe FilePath
     , fzfBashrc :: Maybe FilePath
     , yx :: Maybe FilePath
+    , habit :: Maybe FilePath
     , nixProfile :: Maybe FilePath
     , nixProfileSourced :: Bool
     , haveDirenv :: Bool
@@ -140,6 +141,7 @@ context = do
     fzfBashrc <- Utils.lookupFzfBashrc
 
     yx <- checkFilesM [Home <</> "bin" </> "yx"]
+    habit <- checkFilesM [Home <</> "bin" </> "habit"]
 
     -- This needs testing.  We need to make sure that Nix works as expected,
     -- however we don't want it to be too pervasive.
@@ -185,6 +187,7 @@ context = do
         , tmuxConfig
         , fzfBashrc
         , yx
+        , habit
         , nixProfile
         , nixProfileSourced
         , haveDirenv
@@ -353,9 +356,19 @@ bashrc ctx@Context{..} = do
 
     Utils.fzfConfig fzfBashrc
 
+    let sourceCommandWrapper :: String -> Text -> Bash ()
+        sourceCommandWrapper toolset args =
+            source_ ("<(" <> fromString toolset <> " " <> args <> ")" :: Text)
+
     onJust yx $ \yxBin -> do
-        () <- source_ ("<(" <> fromString yxBin <> " env --script)" :: Text)
+        sourceCommandWrapper yxBin "completion --script --shell=bash"
+        sourceCommandWrapper yxBin "env --script"
         line @Text ("bind '\"\\C-f\":\"" <> fromString yxBin <> " cd\\n\"'")
+
+    onJust habit $ \habitBin -> do
+        alias "hb" "habit"
+        sourceCommandWrapper habitBin
+            "completion --script --shell=bash --alias=hb"
 
     when haveDirenv
         $ source_ ("<(direnv hook bash)" :: Text)
