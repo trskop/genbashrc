@@ -99,7 +99,6 @@ data Context = Context
     , stackBin :: Maybe FilePath
     , tmuxConfig :: Maybe FilePath
     , fzfBashrc :: Maybe FilePath
-    , fzfAlreadyLoaded :: Bool
     , yx :: Maybe FilePath
     , nixProfile :: Maybe FilePath
     , nixProfileSourced :: Bool
@@ -139,10 +138,6 @@ context = do
     haveTmux <- haveExecutable "tmux"
 
     fzfBashrc <- Utils.lookupFzfBashrc
-    fzfAlreadyLoaded <- isJust <$> lookupEnv "_fzf_completion_loader"
-        -- Variable _fzf_completion_loader is defined by FZF Bash completion.
-        -- It's not foolproof, but if it's defined then we can be sure that we
-        -- don't need to reload FZF shell script again.
 
     yx <- checkFilesM [Home <</> "bin" </> "yx"]
 
@@ -189,7 +184,6 @@ context = do
         , stackBin
         , tmuxConfig
         , fzfBashrc
-        , fzfAlreadyLoaded
         , yx
         , nixProfile
         , nixProfileSourced
@@ -357,8 +351,7 @@ bashrc ctx@Context{..} = do
 
     when haveGit $ onJust gitPromptScript source
 
-    unless fzfAlreadyLoaded
-        $ Utils.fzfConfig fzfBashrc
+    Utils.fzfConfig fzfBashrc
 
     onJust yx $ \yxBin -> do
         () <- source_ ("<(" <> fromString yxBin <> " env --script)" :: Text)
