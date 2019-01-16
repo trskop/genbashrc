@@ -20,7 +20,7 @@ import Data.Functor ((<$>))
 import Data.Maybe (Maybe(Just, Nothing), isJust, maybe)
 import Data.Monoid (Monoid, (<>), mempty)
 import Data.Proxy (Proxy(Proxy))
-import Data.String (String, fromString)
+import Data.String (fromString)
 import System.Environment (getArgs, lookupEnv)
 import System.IO (FilePath, IO)
 import Text.Show (Show)
@@ -101,6 +101,11 @@ data Context = Context
     , fzfBashrc :: Maybe FilePath
     , yx :: Maybe FilePath
     , habit :: Maybe FilePath
+    , dhall :: Maybe FilePath
+    , dhallToBash :: Maybe FilePath
+    , dhallToJson :: Maybe FilePath
+    , dhallToYaml :: Maybe FilePath
+    , dhallToText :: Maybe FilePath
     , nixProfile :: Maybe FilePath
     , nixProfileSourced :: Bool
     , haveDirenv :: Bool
@@ -142,6 +147,26 @@ context = do
 
     yx <- checkFilesM [Home <</> "bin" </> "yx"]
     habit <- checkFilesM [Home <</> "bin" </> "habit"]
+    dhall <- checkFilesM
+        [ Home <</> "bin" </> "dhall"
+        , DotLocal <</> "bin" </> "dhall"
+        ]
+    dhallToBash <- checkFilesM
+        [ Home <</> "bin" </> "dhall-to-bash"
+        , DotLocal <</> "bin" </> "dhall-to-bash"
+        ]
+    dhallToJson <- checkFilesM
+        [ Home <</> "bin" </> "dhall-to-json"
+        , DotLocal <</> "bin" </> "dhall-to-json"
+        ]
+    dhallToYaml <- checkFilesM
+        [ Home <</> "bin" </> "dhall-to-yaml"
+        , DotLocal <</> "bin" </> "dhall-to-yaml"
+        ]
+    dhallToText <- checkFilesM
+        [ Home <</> "bin" </> "dhall-to-text"
+        , DotLocal <</> "bin" </> "dhall-to-text"
+        ]
 
     -- This needs testing.  We need to make sure that Nix works as expected,
     -- however we don't want it to be too pervasive.
@@ -188,6 +213,11 @@ context = do
         , fzfBashrc
         , yx
         , habit
+        , dhall
+        , dhallToBash
+        , dhallToJson
+        , dhallToYaml
+        , dhallToText
         , nixProfile
         , nixProfileSourced
         , haveDirenv
@@ -356,25 +386,29 @@ bashrc ctx@Context{..} = do
 
     Utils.fzfConfig fzfBashrc
 
-    let sourceCommandWrapper :: String -> Text -> Bash ()
-        sourceCommandWrapper toolset args =
-            source_ ("<(" <> fromString toolset <> " " <> args <> ")" :: Text)
-
     onJust yx $ \yxBin -> do
-        sourceCommandWrapper yxBin "completion --script --shell=bash"
-        sourceCommandWrapper yxBin "env --script"
+        Utils.sourceCommandWrapperCompletion yxBin []
+        () <- source_ ("<(" <> fromString yxBin <> " env --script)" :: Text)
+
+        -- TODO: Only works in insert mode when Bash is in Vi mode.  FZF works
+        -- in both; get inspired.
         line @Text ("bind '\"\\C-f\":\"" <> fromString yxBin <> " cd\\n\"'")
 
     onJust habit $ \habitBin -> do
         alias "hb" "habit"
-        sourceCommandWrapper habitBin
-            "completion --script --shell=bash --alias=hb"
+        Utils.sourceCommandWrapperCompletion habitBin ["hb"]
 
     when haveDirenv
         $ source_ ("<(direnv hook bash)" :: Text)
 
     unless nixProfileSourced
         $ onJust nixProfile source_
+
+    onJust dhall Utils.sourceOptparseCompletion
+    onJust dhallToBash Utils.sourceOptparseCompletion
+    onJust dhallToJson Utils.sourceOptparseCompletion
+    onJust dhallToYaml Utils.sourceOptparseCompletion
+    onJust dhallToText Utils.sourceOptparseCompletion
 
 onJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
 onJust = for_

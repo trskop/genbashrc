@@ -37,20 +37,29 @@ module GenBashrc.Utils
     -- * FZF
     , lookupFzfBashrc
     , fzfConfig
+
+    -- * Command Wrapper
+    , sourceCommandWrapperCompletion
+
+    -- * Optparse Applicative
+    , sourceOptparseCompletion
     )
   where
 
 import Control.Applicative (pure)
 import Control.Monad ((>>=), when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Bool (Bool, bool)
-import Data.Foldable (for_)
+import Data.Bool (Bool, bool, otherwise)
+import Data.Foldable (for_, null)
 import Data.Function (($), (.))
-import Data.Functor ((<$>))
+import Data.Functor ((<$>), fmap)
 import Data.Maybe (Maybe(Just, Nothing), maybe)
+import Data.Monoid ((<>))
 import Data.String (fromString)
 import System.IO (FilePath)
 
+import Data.Text (Text)
+import qualified Data.Text as Text (unwords)
 import System.Directory (findExecutable)
 import System.FilePath ((</>))
 
@@ -148,8 +157,8 @@ standardAliases AliasOptions{..} = do
     alias "mv" "'mv -i'"
     alias "rm" "'rm -i'"
 
-    whenOs_ linux currentOs $ do
-        withDircollorsWhen haveDircolors userDircolors $ do
+    whenOs_ linux currentOs
+        . withDircollorsWhen haveDircolors userDircolors $ do
             alias "ls" "'ls --color=auto'"
             alias "dir" "'dir --color=auto'"
             alias "vdir" "'vdir --color=auto'"
@@ -170,3 +179,40 @@ standardAliases AliasOptions{..} = do
             $ alias "diff" "colordiff"
 
 -- }}} Aliases ----------------------------------------------------------------
+
+-- {{{ Command Wrapper --------------------------------------------------------
+
+-- | Source Bash completion for a Command Wrapper toolset.
+sourceCommandWrapperCompletion
+    :: FilePath
+    -- ^ Toolset executable, best to use full path.
+    -> [Text]
+    -- ^ Aliases under which the toolset is also known.
+    -> Bash ()
+sourceCommandWrapperCompletion toolset aliases' =
+    source_
+        $ "<("
+        <> fromString toolset <> " " <> "completion --script --shell=bash"
+        <> aliases
+        <> ")"
+  where
+    aliases
+      | null aliases' = ""
+      | otherwise     = Text.unwords ("" : fmap ("--alias=" <>) aliases')
+
+-- }}} Command Wrapper --------------------------------------------------------
+
+-- {{{ Optparse Applicative ---------------------------------------------------
+
+-- | Source Bash completion script for an executable that uses standard
+-- @optparse-applicative@ Bash completion API.
+sourceOptparseCompletion
+    :: FilePath
+    -- ^ Full path to the executable.
+    -> Bash ()
+sourceOptparseCompletion exe' =
+    source_ ("<(" <> exe <> " --bash-completion-script " <> exe <> ")" :: Text)
+  where
+    exe = fromString exe'
+
+-- }}} Optparse Applicative ---------------------------------------------------
