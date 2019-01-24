@@ -21,10 +21,13 @@ import Data.Maybe (Maybe(Just, Nothing), isJust, maybe)
 import Data.Monoid (Monoid, (<>), mempty)
 import Data.Proxy (Proxy(Proxy))
 import Data.String (fromString)
-import System.Environment (getArgs, lookupEnv)
+import System.Environment (getArgs, getProgName, lookupEnv)
 import System.IO (FilePath, IO)
-import Text.Show (Show)
+import Text.Show (Show, show)
 
+import qualified Crypto.Hash.SHA256 as SHA256 (hash)
+import qualified Data.ByteString.Base16 as Base16
+import Data.String.ToString (toString)
 import Data.Text (Text)
 import qualified Data.Text.Lazy as Lazy (Text)
 import qualified Data.Text.Lazy.IO as Lazy.Text (putStr, writeFile)
@@ -33,6 +36,7 @@ import System.Directory (getHomeDirectory)
 import System.FilePath ((</>))
 
 import GenBashrc.Bash
+import GenBashrc.Cache (getCacheStdFilePath)
 import GenBashrc.FilePath
 import GenBashrc.Os
 import qualified GenBashrc.Os.Linux as Linux
@@ -54,14 +58,35 @@ import qualified GenBashrc.Utils as Utils
 
 main :: IO ()
 main = getArgs >>= \case
-    [] -> main' Lazy.Text.putStr
+    [] ->
+        main' Lazy.Text.putStr
+
+    ["--cached"] ->
+        mainCached Lazy.Text.putStr
+
+    ["--cached", outputFileName] ->
+        mainCached (Lazy.Text.writeFile outputFileName)
+
     [outputFileName] ->
         -- TODO: Make output writing an atomic operation.
-        main' $ Lazy.Text.writeFile outputFileName
-    _ -> error "Too many arguments."
+        main' (Lazy.Text.writeFile outputFileName)
+
+    _ ->
+        error "Usage: genbashrc [--cached] [OUTPUT_FILE]"
 
 main' :: (Lazy.Text -> IO a) -> IO a
 main' writeOutput = context >>= writeOutput . genBash . bashrc
+
+mainCached :: (Lazy.Text -> IO a) -> IO a
+mainCached writeOutput = do
+    appName <- getProgName
+    ctx <- context
+    -- TODO: Hash of genbashrc executable should be used instead of "1".  That
+    -- way if genbashrc changes outdated cache won't be used.
+    cache <- getCacheStdFilePath appName "1" (hashContext ctx)
+    genBashCached cache (bashrc ctx) >>= writeOutput
+  where
+    hashContext = toString . Base16.encode . SHA256.hash . fromString . show
 
 -- | All the information we gathered from the system and users environment.
 --

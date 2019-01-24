@@ -48,7 +48,7 @@ import qualified Data.Semigroup as Semigroup ((<>))
 import Data.String (IsString, String, fromString)
 import Data.Traversable (Traversable)
 import Data.Word (Word)
-import System.IO (FilePath)
+import System.IO (FilePath, IO)
 import Text.Show (Show(showsPrec), show)
 
 import Control.Monad.State (StateT, evalStateT, modify, state)
@@ -66,6 +66,7 @@ import qualified Data.Text.Lazy.Builder as Text.Builder
     )
 import System.FilePath.Posix (searchPathSeparator)
 
+import GenBashrc.Cache (cached)
 
 data BashContext = BashContext
     { indentLevel :: Word
@@ -180,6 +181,9 @@ genBash = Text.Builder.toLazyText . fromMaybe mempty . execWriterT
         , indentStep = "    "
         , inLine = False
         }
+
+genBashCached :: FilePath -> Bash () -> IO Lazy.Text
+genBashCached cacheFile = cached cacheFile genBash
 
 startLineIfNotAlready :: Bash ()
 startLineIfNotAlready = Bash $ do

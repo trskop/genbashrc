@@ -26,6 +26,7 @@ library
   hs-source-dirs:       src
   exposed-modules:
     GenBashrc.Bash
+    GenBashrc.Cache
     GenBashrc.FilePath
     GenBashrc.Os
     GenBashrc.Os.Linux
@@ -39,10 +40,12 @@ library
 
   build-depends:
       base >= 4.7 && < 5
+
     , directory
     , filepath
     , mtl
     , text
+    , tostring
 
   ghc-options:          -Wall
 
@@ -55,11 +58,16 @@ executable genbashrc
 
   build-depends:
       base
-    , genbashrc
+
+    , base16-bytestring
+    , cryptohash-sha256
     , directory
     , filepath
     , hostname
     , text
+    , tostring
+
+    , genbashrc
   ghc-options:         	-Wall -threaded -rtsopts -with-rtsopts=-N
 
 test-suite genbashrc-test
