@@ -415,9 +415,13 @@ bashrc ctx@Context{..} = do
         Utils.sourceCommandWrapperCompletion yxBin []
         () <- source_ ("<(" <> fromString yxBin <> " env --script)" :: Text)
 
-        -- TODO: Only works in insert mode when Bash is in Vi mode.  FZF works
-        -- in both; get inspired.
+        -- TODO: This will leave an entry in Bash history.  FZF doesn't; get
+        -- inspired.
         line @Text ("bind '\"\\C-f\":\"" <> fromString yxBin <> " cd\\n\"'")
+
+        -- When CTRL+f is pressed in normal mode then switch to insert mode and
+        -- call it there.
+        line @Text "bind -m vi-command '\"\\C-f\": \"i\\C-f\"'"
 
     onJust habit $ \habitBin -> do
         alias "hb" "habit"
