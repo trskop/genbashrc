@@ -54,7 +54,7 @@ import Text.Show (Show(showsPrec), show)
 import Control.Monad.State (StateT, evalStateT, modify, state)
 import Control.Monad.Writer (WriterT, execWriterT, tell)
 import Data.Text (Text)
-import qualified Data.Text as Text (null, singleton)
+import qualified Data.Text as Text (intercalate, null, singleton)
 import qualified Data.Text.Lazy as Lazy (Text)
 import qualified Data.Text.Lazy as Lazy.Text (fromStrict)
 import qualified Data.Text.Lazy.Builder as Text (Builder)
@@ -620,5 +620,9 @@ histsize = set "HISTSIZE" . maybe "" (fromString . show)
 
 histfilesize :: Maybe Word -> Bash ()
 histfilesize = set "HISTFILESIZE" . maybe "" (fromString . show)
+
+histignore :: [BashString] -> Bash ()
+histignore =
+    set' ("HISTIGNORE" :: VariableName) . Text.intercalate ":" . coerce
 
 -- }}} History ----------------------------------------------------------------

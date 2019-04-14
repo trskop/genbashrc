@@ -313,6 +313,9 @@ history _ = do
     -- Don't truncate history file.
     histfilesize Nothing
 
+    -- Don't store following commands in history:
+    histignore ["ls", "pwd"]
+
 setPrompt :: Context -> Bash ()
 setPrompt Context{..} = do
     function "__env_ps1" $ do
