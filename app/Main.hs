@@ -420,7 +420,8 @@ bashrc ctx@Context{..} = do
 
         -- TODO: This will leave an entry in Bash history.  FZF doesn't; get
         -- inspired.
-        line @Text ("bind '\"\\C-f\":\"" <> fromString yxBin <> " cd\\n\"'")
+        line @Text ("bind '\"\\C-f\":\"" <> fromString yxBin <> " cd --shell\\n\"'")
+        line @Text ("bind '\"\\C-k\":\"" <> fromString yxBin <> " cd\\n\"'")
 
         -- When CTRL+f is pressed in normal mode then switch to insert mode and
         -- call it there.
