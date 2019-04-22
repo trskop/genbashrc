@@ -1,3 +1,4 @@
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -134,6 +135,8 @@ data Context = Context
     , nixProfile :: Maybe FilePath
     , nixProfileSourced :: Bool
     , haveDirenv :: Bool
+    , haveRipgrep :: Bool
+    , ripgrepConfig :: Maybe FilePath
     }
   deriving (Eq, Show)
 
@@ -203,50 +206,16 @@ context = do
     -- '~/.profile' file.  <https://direnv.net/>
     haveDirenv <- haveExecutable "direnv"
 
-    pure Context
-        { hostname
-        , currentOs
-        , haveTouchpad = False -- TODO
-            -- $ grep "^N: Name=.* Touchpad" /proc/bus/input/devices
-            -- N: Name="ELAN1200:00 04F3:3059 Touchpad"
-        , haveSudo
-        , haveMplayer
-        , haveXpdfCompat
-        , haveColorDiff
-        , haveScreen
-        , haveTmux
-        , haveNeovim
-        , haveVim
-        , haveDircolors
-        , haveXinput
-        , haveCdrom
-        , haveGit
-        , canCloseCdrom = False -- TODO
-        , home
-        , userBinDir
-        , userBinDir'
-        , userBinDirInPath
-        , userLocalBinDir
-        , userLocalBinDir'
-        , userLocalBinDirInPath
-        , bashCompletionScript
-        , gitPromptScript
-        , userDircolors
-        , lesspipeCommand
-        , stackBin
-        , tmuxConfig
-        , fzfBashrc
-        , yx
-        , habit
-        , dhall
-        , dhallToBash
-        , dhallToJson
-        , dhallToYaml
-        , dhallToText
-        , nixProfile
-        , nixProfileSourced
-        , haveDirenv
-        }
+    haveRipgrep <- haveExecutable "rg"
+    ripgrepConfig <- checkFilesM [xdgConfig <</> "ripgrep" </> "ripgreprc"]
+
+    let -- $ grep "^N: Name=.* Touchpad" /proc/bus/input/devices
+        -- N: Name="ELAN1200:00 04F3:3059 Touchpad"
+        haveTouchpad = False
+
+        canCloseCdrom = False -- TODO
+
+    pure Context{..}
   where
     orA = liftA2 (||)
 
@@ -262,21 +231,21 @@ aliases :: Context -> Bash ()
 aliases Context{..} = do
     Utils.standardAliases Utils.AliasOptions{..}
 
-    whenOs linux currentOs $ \linuxOs -> do
+    whenOs linux currentOs \linuxOs -> do
         Linux.whenDistro_ Linux.notDebianCompat linuxOs
             vimAliasForNeovim
 
-        whenPackageManager_ Linux.apt linuxOs $ do
+        whenPackageManager_ Linux.apt linuxOs do
             alias "apt-get" "'sudo apt-get'"
             alias "apt"     "'sudo apt'"
             alias "this"    "'yx this'"
 
-        when (haveTouchpad && haveXinput) $ do
+        when (haveTouchpad && haveXinput) do
             -- TODO: Rewrite following to use xinput.
             alias "touchpad-off" "'synclient TouchpadOff=1'"
             alias "touchpad-on"  "'synclient TouchpadOff=0'"
 
-        when haveCdrom $ do
+        when haveCdrom do
             alias "'eject" "eject -d'"
             unless canCloseCdrom $ alias "close" "'eject -d -t'"
 
@@ -293,6 +262,9 @@ aliases Context{..} = do
             $ "'TERM=xterm-256color tmux"
             <> maybe "" (\cfg -> " -f \"" <> fromString cfg <> "\"") tmuxConfig
             <> "'"
+
+    when haveRipgrep $ onJust ripgrepConfig \cfg ->
+        alias "rg" ("'RIPGREP_CONFIG_PATH=\"" <> fromString cfg <> "\" rg'")
 
     alias "term-title" "'printf \"\\033]2;%s\\007\"'"
   where
@@ -318,7 +290,7 @@ history _ = do
 
 setPrompt :: Context -> Bash ()
 setPrompt Context{..} = do
-    function "__env_ps1" $ do
+    function "__env_ps1" do
         let -- Variable CD_LEVEL indicates how many times we have invoked "yx cd" and
             -- ended up in a subshell.
             yxCd = "${CD_LEVEL:+⟦${CD_LEVEL}⟧}"
@@ -331,7 +303,7 @@ setPrompt Context{..} = do
 
         line @Text ("echo \"" <> yxCd <> yxEnv <> direnv <> "\"")
 
-    when (isJust nixProfile) $ do
+    when (isJust nixProfile) do
         function "__nix_shell_ps1"
             $ line @Text "echo \"${IN_NIX_SHELL:+⟪nix⟫}\""
 
@@ -403,10 +375,10 @@ bashrc ctx@Context{..} = do
 
     aliases ctx
 
-    onJust bashCompletionScript $ \script ->
-        bashIfThen "! shopt -oq posix" $ do
+    onJust bashCompletionScript \script ->
+        bashIfThen "! shopt -oq posix" do
             () <- source_ script
-            onJust stackBin $ \stack ->
+            onJust stackBin \stack ->
                 when ((stack `isInDir` home) || (macOs `isOs` currentOs))
                     Utils.stackBashCompletion
 
@@ -414,7 +386,7 @@ bashrc ctx@Context{..} = do
 
     Utils.fzfConfig fzfBashrc
 
-    onJust yx $ \yxBin -> do
+    onJust yx \yxBin -> do
         Utils.sourceCommandWrapperCompletion yxBin []
         () <- source_ ("<(" <> fromString yxBin <> " env --script)" :: Text)
 
@@ -427,7 +399,7 @@ bashrc ctx@Context{..} = do
         -- call it there.
         line @Text "bind -m vi-command '\"\\C-f\": \"i\\C-f\"'"
 
-    onJust habit $ \habitBin -> do
+    onJust habit \habitBin -> do
         alias "hb" "habit"
         Utils.sourceCommandWrapperCompletion habitBin ["hb"]
 
