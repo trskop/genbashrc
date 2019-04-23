@@ -298,7 +298,11 @@ setPrompt Context{..} = do
             -- Variable YX_ENV_DIR indicates that we are in a local environment
             -- delimited by "$YX_ENV_DIR/.yx-env" file.  Similar thing goes for
             -- DIRENV_DIR, only the file is named "$DIRENV_DIR/.envrc".
-            yxEnv = "${YX_ENV_DIR:+∃}"
+            yxEnv = mguard (isJust yx) "${YX_ENV_DIR:+∃}"
+
+            -- TODO: DIRENV_DIR is populated even if environment is not loaded.
+            -- In which case it is prefixed with `-` character, making the path
+            -- invalid.
             direnv = mguard haveDirenv "${DIRENV_DIR:+∃}"
 
         line @Text ("echo \"" <> yxCd <> yxEnv <> direnv <> "\"")
