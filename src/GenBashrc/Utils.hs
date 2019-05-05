@@ -40,6 +40,7 @@ module GenBashrc.Utils
 
     -- * Command Wrapper
     , sourceCommandWrapperCompletion
+    , sourceCommandWrapperSubcommandCompletion
 
     -- * Optparse Applicative
     , sourceOptparseCompletion
@@ -53,6 +54,7 @@ import Data.Bool (Bool, bool, otherwise)
 import Data.Foldable (for_, null)
 import Data.Function (($), (.))
 import Data.Functor ((<$>), fmap)
+import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Maybe (Maybe(Just, Nothing), maybe)
 import Data.Monoid ((<>))
 import Data.String (fromString)
@@ -199,6 +201,24 @@ sourceCommandWrapperCompletion toolset aliases' =
     aliases
       | null aliases' = ""
       | otherwise     = Text.unwords ("" : fmap ("--alias=" <>) aliases')
+
+-- | Source Bash completion for a subcommand of Command Wrapper toolset.
+sourceCommandWrapperSubcommandCompletion
+    :: FilePath
+    -- ^ Toolset executable, best to use full path.
+    -> Text
+    -> NonEmpty Text
+    -- ^ Aliases under which the toolset is also known.
+    -> Bash ()
+sourceCommandWrapperSubcommandCompletion toolset subcommand (a :| as) =
+    source_
+        $ "<("
+        <> fromString toolset <> " " <> "completion --script --shell=bash"
+        <> " --subcommand=" <> subcommand
+        <> aliases
+        <> ")"
+  where
+    aliases = Text.unwords ("" : fmap ("--alias=" <>) (a : as))
 
 -- }}} Command Wrapper --------------------------------------------------------
 

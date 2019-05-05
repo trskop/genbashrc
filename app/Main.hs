@@ -18,6 +18,7 @@ import Data.Eq (Eq)
 import Data.Foldable (for_)
 import Data.Function (($), (.))
 import Data.Functor ((<$>))
+import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Maybe (Maybe(Just, Nothing), isJust, maybe)
 import Data.Monoid (Monoid, (<>), mempty)
 import Data.Proxy (Proxy(Proxy))
@@ -392,6 +393,7 @@ bashrc ctx@Context{..} = do
 
     onJust yx \yxBin -> do
         Utils.sourceCommandWrapperCompletion yxBin []
+        Utils.sourceCommandWrapperSubcommandCompletion yxBin "this" ("this" :| [])
         () <- source_ ("<(" <> fromString yxBin <> " env --script)" :: Text)
 
         -- TODO: This will leave an entry in Bash history.  FZF doesn't; get
