@@ -128,7 +128,6 @@ data Context = Context
     , fzfBashrc :: Maybe FilePath
     , yx :: Maybe FilePath
     , habit :: Maybe FilePath
-    , dhall :: Maybe FilePath
     , dhallToBash :: Maybe FilePath
     , dhallToJson :: Maybe FilePath
     , dhallToYaml :: Maybe FilePath
@@ -176,10 +175,6 @@ context = do
 
     yx <- checkFilesM [Home <</> "bin" </> "yx"]
     habit <- checkFilesM [Home <</> "bin" </> "habit"]
-    dhall <- checkFilesM
-        [ Home <</> "bin" </> "dhall"
-        , DotLocal <</> "bin" </> "dhall"
-        ]
     dhallToBash <- checkFilesM
         [ Home <</> "bin" </> "dhall-to-bash"
         , DotLocal <</> "bin" </> "dhall-to-bash"
@@ -240,6 +235,9 @@ aliases Context{..} = do
             alias "apt-get" "'sudo apt-get'"
             alias "apt"     "'sudo apt'"
             alias "this"    "'yx this'"
+
+            alias "dhall"      "'yx config --dhall"
+            alias "dhall-repl" "'yx config --dhall-repl"
 
         when (haveTouchpad && haveXinput) do
             -- TODO: Rewrite following to use xinput.
@@ -393,7 +391,16 @@ bashrc ctx@Context{..} = do
 
     onJust yx \yxBin -> do
         Utils.sourceCommandWrapperCompletion yxBin []
-        Utils.sourceCommandWrapperSubcommandCompletion yxBin "this" ("this" :| [])
+
+        Utils.sourceCommandWrapperSubcommandCompletion yxBin "this"
+            ("this" :| [])
+
+        Utils.sourceCommandWrapperSubcommandCompletion yxBin "dhall"
+            ( "dhall" :| [])
+
+        Utils.sourceCommandWrapperSubcommandCompletion yxBin "dhall-repl"
+            ( "dhall-repl" :| [])
+
         () <- source_ ("<(" <> fromString yxBin <> " env --script)" :: Text)
 
         -- TODO: This will leave an entry in Bash history.  FZF doesn't; get
@@ -415,7 +422,6 @@ bashrc ctx@Context{..} = do
     unless nixProfileSourced
         $ onJust nixProfile source_
 
-    onJust dhall Utils.sourceOptparseCompletion
     onJust dhallToBash Utils.sourceOptparseCompletion
     onJust dhallToJson Utils.sourceOptparseCompletion
     onJust dhallToYaml Utils.sourceOptparseCompletion
