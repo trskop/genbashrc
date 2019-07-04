@@ -235,6 +235,7 @@ aliases Context{..} = do
             alias "apt-get" "'sudo apt-get'"
             alias "apt"     "'sudo apt'"
             alias "this"    "'yx this'"
+            alias "xpdf"    "'yx xpdf"
 
             alias "dhall"      "'yx config --dhall"
             alias "dhall-repl" "'yx config --dhall-repl"
@@ -400,6 +401,9 @@ bashrc ctx@Context{..} = do
 
         Utils.sourceCommandWrapperSubcommandCompletion yxBin "dhall-repl"
             ( "dhall-repl" :| [])
+
+        Utils.sourceCommandWrapperSubcommandCompletion yxBin "xpdf"
+            ("xpdf" :| [])
 
         () <- source_ ("<(" <> fromString yxBin <> " env --script)" :: Text)
 
