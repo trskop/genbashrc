@@ -241,10 +241,10 @@ aliases Context{..} = do
                 alias "apt-cache" "'yx apt'"
                 alias "apt-get"   "'yx apt'"
                 alias "this"      "'yx this'"
-                alias "xpdf"      "'yx xpdf"
+                alias "xpdf"      "'yx xpdf'"
 
-                alias "dhall"      "'yx config --dhall"
-                alias "dhall-repl" "'yx config --dhall-repl"
+                alias "dhall"      "'yx config --dhall'"
+                alias "dhall-repl" "'yx config --dhall-repl'"
 
         when (haveTouchpad && haveXinput) do
             -- TODO: Rewrite following to use xinput.
