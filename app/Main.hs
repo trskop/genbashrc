@@ -231,14 +231,20 @@ aliases Context{..} = do
         Linux.whenDistro_ Linux.notDebianCompat linuxOs
             vimAliasForNeovim
 
-        whenPackageManager_ Linux.apt linuxOs do
-            alias "apt-get" "'sudo apt-get'"
-            alias "apt"     "'sudo apt'"
-            alias "this"    "'yx this'"
-            alias "xpdf"    "'yx xpdf"
+        whenPackageManager_ Linux.apt linuxOs case yx of
+            Nothing -> do
+                alias "apt"     "'sudo apt'"
+                alias "apt-get" "'sudo apt-get'"
 
-            alias "dhall"      "'yx config --dhall"
-            alias "dhall-repl" "'yx config --dhall-repl"
+            Just _ -> do
+                alias "apt"       "'yx apt'"
+                alias "apt-cache" "'yx apt'"
+                alias "apt-get"   "'yx apt'"
+                alias "this"      "'yx this'"
+                alias "xpdf"      "'yx xpdf"
+
+                alias "dhall"      "'yx config --dhall"
+                alias "dhall-repl" "'yx config --dhall-repl"
 
         when (haveTouchpad && haveXinput) do
             -- TODO: Rewrite following to use xinput.
@@ -394,16 +400,19 @@ bashrc ctx@Context{..} = do
         Utils.sourceCommandWrapperCompletion yxBin []
 
         Utils.sourceCommandWrapperSubcommandCompletion yxBin "this"
-            ("this" :| [])
+            (pure "this")
 
         Utils.sourceCommandWrapperSubcommandCompletion yxBin "dhall"
-            ( "dhall" :| [])
+            (pure  "dhall")
 
         Utils.sourceCommandWrapperSubcommandCompletion yxBin "dhall-repl"
-            ( "dhall-repl" :| [])
+            (pure "dhall-repl")
 
         Utils.sourceCommandWrapperSubcommandCompletion yxBin "xpdf"
-            ("xpdf" :| [])
+            (pure "xpdf")
+
+        Utils.sourceCommandWrapperSubcommandCompletion yxBin "apt"
+            ("apt" :| ["apt-cache", "apt-get"])
 
         () <- source_ ("<(" <> fromString yxBin <> " env --script)" :: Text)
 
