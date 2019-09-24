@@ -414,8 +414,7 @@ bashrc ctx@Context{..} = do
         Utils.sourceCommandWrapperSubcommandCompletion yxBin "apt"
             ("apt" :| ["apt-cache", "apt-get"])
 
---      TODO: Temporarily disabled after Dhall upgrade.
---      () <- source_ ("<(" <> fromString yxBin <> " env --script)" :: Text)
+        () <- source_ ("<(" <> fromString yxBin <> " env --script)" :: Text)
 
         -- TODO: This will leave an entry in Bash history.  FZF doesn't; get
         -- inspired.
