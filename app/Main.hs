@@ -17,7 +17,7 @@ import Data.Bool (Bool(False), (&&), (||), not)
 import Data.Eq (Eq)
 import Data.Foldable (for_)
 import Data.Function (($), (.))
-import Data.Functor ((<$>))
+import Data.Functor ((<$>), (<&>))
 import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Maybe (Maybe(Just, Nothing), isJust, maybe)
 import Data.Monoid (Monoid, (<>), mempty)
@@ -223,6 +223,29 @@ context = do
                 ]
             )
 
+-- TODO: We could ask `command-wrapper` to give us this list.
+--
+-- > yx completion --index=0 --subcommand=config -- --dhall
+dhallSubcommands :: [(CommandName, BashString)]
+dhallSubcommands = suffixes <&> \suffix ->
+    let command = "dhall" <> suffix
+    in  (CommandName command, BashString ("--" <> command))
+  where
+    suffixes =
+        [ ""
+        , "-bash"
+        , "-diff"
+        , "-exec"
+        , "-filter"
+        , "-format"
+        , "-freeze"
+        , "-hash"
+        , "-lint"
+        , "-repl"
+        , "-resolve"
+        , "-text"
+        ]
+
 aliases :: Context -> Bash ()
 aliases Context{..} = do
     Utils.standardAliases Utils.AliasOptions{..}
@@ -243,8 +266,8 @@ aliases Context{..} = do
                 alias "this"      "'yx this'"
                 alias "xpdf"      "'yx xpdf'"
 
-                alias "dhall"      "'yx config --dhall'"
-                alias "dhall-repl" "'yx config --dhall-repl'"
+                for_ dhallSubcommands \(subcommand, option) -> do
+                    alias subcommand ("'yx config " <> option <> "'")
 
         when (haveTouchpad && haveXinput) do
             -- TODO: Rewrite following to use xinput.
@@ -402,11 +425,9 @@ bashrc ctx@Context{..} = do
         Utils.sourceCommandWrapperSubcommandCompletion yxBin "this"
             (pure "this")
 
-        Utils.sourceCommandWrapperSubcommandCompletion yxBin "dhall"
-            (pure  "dhall")
-
-        Utils.sourceCommandWrapperSubcommandCompletion yxBin "dhall-repl"
-            (pure "dhall-repl")
+        for_ dhallSubcommands \(CommandName command, _) ->
+            Utils.sourceCommandWrapperSubcommandCompletion yxBin command
+                (pure command)
 
         Utils.sourceCommandWrapperSubcommandCompletion yxBin "xpdf"
             (pure "xpdf")
