@@ -137,6 +137,7 @@ data Context = Context
     , haveDirenv :: Bool
     , haveRipgrep :: Bool
     , ripgrepConfig :: Maybe FilePath
+    , haveFd :: Bool
     }
   deriving (Eq, Show)
 
@@ -204,6 +205,8 @@ context = do
 
     haveRipgrep <- haveExecutable "rg"
     ripgrepConfig <- checkFilesM [xdgConfig <</> "ripgrep" </> "ripgreprc"]
+
+    haveFd <- haveExecutable "fd"
 
     let -- $ grep "^N: Name=.* Touchpad" /proc/bus/input/devices
         -- N: Name="ELAN1200:00 04F3:3059 Touchpad"
@@ -418,6 +421,10 @@ bashrc ctx@Context{..} = do
     when haveGit $ onJust gitPromptScript source
 
     Utils.fzfConfig fzfBashrc
+    when (isJust fzfBashrc && haveFd) do
+        let fdCommand = "'fd --type file'"
+        set "FZF_DEFAULT_COMMAND" fdCommand
+        set "FZF_CTRL_T_COMMAND" fdCommand
 
     onJust yx \yxBin -> do
         Utils.sourceCommandWrapperCompletion yxBin []
