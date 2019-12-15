@@ -13,7 +13,7 @@ import Prelude (error)
 
 import Control.Applicative (Applicative, (*>), liftA2, pure)
 import Control.Monad ((>>=), guard, unless, when)
-import Data.Bool (Bool(False), (&&), (||), not)
+import Data.Bool (Bool(False), (&&), (||), not, otherwise)
 import Data.Eq (Eq)
 import Data.Foldable (for_)
 import Data.Function (($), (.))
@@ -138,6 +138,9 @@ data Context = Context
     , haveRipgrep :: Bool
     , ripgrepConfig :: Maybe FilePath
     , haveFd :: Bool
+    , haveFdfind :: Bool
+    -- ^ Command `fdfind` is the same as `fd` on Debian systems.  This is to
+    -- disambiguate it from some other command.
     }
   deriving (Eq, Show)
 
@@ -207,6 +210,7 @@ context = do
     ripgrepConfig <- checkFilesM [xdgConfig <</> "ripgrep" </> "ripgreprc"]
 
     haveFd <- haveExecutable "fd"
+    haveFdfind <- haveExecutable "fdfind"
 
     let -- $ grep "^N: Name=.* Touchpad" /proc/bus/input/devices
         -- N: Name="ELAN1200:00 04F3:3059 Touchpad"
@@ -278,8 +282,13 @@ aliases Context{..} = do
             alias "touchpad-on"  "'synclient TouchpadOff=0'"
 
         when haveCdrom do
-            alias "'eject" "eject -d'"
+            alias "eject" "'eject -d'"
             unless canCloseCdrom $ alias "close" "'eject -d -t'"
+
+        when (haveFdfind && not haveFd) do
+            -- On some systems `fd` command is available under the name
+            -- `fdfind`.
+            alias "fd" "'fdfind'"
 
     whenOs_ macOs currentOs
         vimAliasForNeovim
@@ -421,8 +430,12 @@ bashrc ctx@Context{..} = do
     when haveGit $ onJust gitPromptScript source
 
     Utils.fzfConfig fzfBashrc
-    when (isJust fzfBashrc && haveFd) do
-        let fdCommand = "'fd --type file'"
+    when (isJust fzfBashrc && (haveFd || haveFdfind)) do
+        let fdCommand
+              | haveFd = "'fd --type file'"
+                -- This is actually the 'haveFdfind' case:
+              | otherwise = "'fd --type file'"
+
         set "FZF_DEFAULT_COMMAND" fdCommand
         set "FZF_CTRL_T_COMMAND" fdCommand
 
