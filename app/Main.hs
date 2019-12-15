@@ -140,7 +140,15 @@ data Context = Context
     , haveFd :: Bool
     , haveFdfind :: Bool
     -- ^ Command `fdfind` is the same as `fd` on Debian systems.  This is to
-    -- disambiguate it from some other command.
+    -- disambiguate it from some other commands that use the same name.
+    --
+    -- <https://github.com/sharkdp/fd>
+    , haveYank :: Bool
+    , haveYankCli :: Bool
+    -- ^ Command `yank-cli` is the same as `yank` on Debian systems.  This is
+    -- to disambiguate it from some other commands that use the same name.
+    --
+    -- <https://github.com/mptre/yank>
     }
   deriving (Eq, Show)
 
@@ -211,6 +219,9 @@ context = do
 
     haveFd <- haveExecutable "fd"
     haveFdfind <- haveExecutable "fdfind"
+
+    haveYank <- haveExecutable "yank"
+    haveYankCli <- haveExecutable "yank-cli"
 
     let -- $ grep "^N: Name=.* Touchpad" /proc/bus/input/devices
         -- N: Name="ELAN1200:00 04F3:3059 Touchpad"
@@ -289,6 +300,11 @@ aliases Context{..} = do
             -- On some systems `fd` command is available under the name
             -- `fdfind`.
             alias "fd" "'fdfind'"
+
+        when (haveYankCli && not haveYank) do
+            -- On some systems `yank` command is available under the name
+            -- `yank-cli`.
+            alias "yank" "'yank-cli'"
 
     whenOs_ macOs currentOs
         vimAliasForNeovim
