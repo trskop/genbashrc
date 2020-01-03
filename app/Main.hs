@@ -106,6 +106,7 @@ data Context = Context
     , haveScreen :: Bool
     , haveTmux :: Bool
     , haveNeovim :: Bool
+    , haveNeovimRemote :: Bool
     , haveVim :: Bool
     , haveDircolors :: Bool
     , haveXinput :: Bool
@@ -149,6 +150,7 @@ data Context = Context
     -- to disambiguate it from some other commands that use the same name.
     --
     -- <https://github.com/mptre/yank>
+    , xdgRuntimeDir :: FilePath
     }
   deriving (Eq, Show)
 
@@ -164,6 +166,7 @@ context = do
     haveSudo <- haveExecutable "sudo"
     haveVim <- haveExecutable "vim"
     haveNeovim <- haveExecutable "nvim"
+    haveNeovimRemote <- haveExecutable "nvr"
     haveMplayer <- haveExecutable "mplayer"
     haveXpdfCompat <- haveXpdfCompatExecutable
     haveColorDiff <- haveExecutable "colordiff"
@@ -222,6 +225,8 @@ context = do
 
     haveYank <- haveExecutable "yank"
     haveYankCli <- haveExecutable "yank-cli"
+
+    xdgRuntimeDir <- userDir XdgRuntime ""
 
     let -- $ grep "^N: Name=.* Touchpad" /proc/bus/input/devices
         -- N: Name="ELAN1200:00 04F3:3059 Touchpad"
@@ -309,7 +314,12 @@ aliases Context{..} = do
     whenOs_ macOs currentOs
         vimAliasForNeovim
 
-    alias "evil" $ if haveSudo then "'sudo su -'" else "'su -'"
+    when (haveNeovim && haveNeovimRemote) do
+        bashIfThen "[[ -n \"${NVIM_LISTEN_ADDRESS:-}\" ]]" do
+            alias "vim" "'nvr --nostart'"
+            alias "nvim" "'nvr --nostart'"
+
+    alias "evil" if haveSudo then "'sudo su -'" else "'su -'"
 
     when haveMplayer $ alias "mplayer" "'mplayer -idx'"
     when haveXpdfCompat $ alias "xpdf" "xpdf-compat"
