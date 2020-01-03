@@ -38,7 +38,8 @@ import Data.Foldable (any)
 import Data.Function (($), (.), flip, on)
 import Data.Functor ((<$>))
 import qualified Data.List as List (isPrefixOf)
-import Data.Maybe (Maybe(Just, Nothing), isJust)
+import Data.Maybe (Maybe(Just, Nothing), fromMaybe, isJust)
+import System.Environment (lookupEnv)
 import System.IO (FilePath)
 
 import System.Directory
@@ -76,6 +77,7 @@ data UserDirectory
     = Home
     | Xdg XdgDirectory
     | DotLocal
+    | XdgRuntime
 
 xdgConfig :: UserDirectory
 xdgConfig = Xdg XdgConfig
@@ -106,6 +108,7 @@ userDir base relDir = liftIO $ case base of
     Home -> homeDir relDir
     Xdg d -> liftIO $ getXdgDirectory d relDir
     DotLocal -> homeDir (".local" </> relDir)
+    XdgRuntime -> fromMaybe "/tmp" <$> liftIO (lookupEnv "XDG_RUNTIME_DIR")
   where
     homeDir p = (</> p) <$> liftIO getHomeDirectory
 
