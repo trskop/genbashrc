@@ -6,6 +6,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
+-- |
+-- Module:      Main
+-- Description: Generate contents of user's ~/.bashrc
+-- Copyright:   (c) 2017-2020 Peter Trško
+-- License:     BSD3
+--
+-- Maintainer:  peter.trsko@gmail.com
+-- Stability:   experimental
+-- Portability: GHC specific language extensible; POSIX.
+--
+-- Generate contents of user's @~/.bashrc@.
 module Main (main)
   where
 
@@ -15,9 +26,10 @@ import Control.Applicative (Applicative, (*>), liftA2, pure)
 import Control.Monad ((>>=), guard, unless, when)
 import Data.Bool (Bool(False), (&&), (||), not, otherwise)
 import Data.Eq (Eq)
-import Data.Foldable (for_)
+import Data.Foldable (for_, or)
 import Data.Function (($), (.))
 import Data.Functor ((<$>), (<&>))
+import qualified Data.List as List (notElem, take)
 import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Maybe (Maybe(Just, Nothing), isJust, maybe)
 import Data.Monoid (Monoid, (<>), mempty)
@@ -35,7 +47,7 @@ import qualified Data.Text.Lazy as Lazy (Text)
 import qualified Data.Text.Lazy.IO as Lazy.Text (putStr, writeFile)
 import Network.HostName (HostName, getHostName)
 import System.Directory (getHomeDirectory)
-import System.FilePath ((</>))
+import System.FilePath ((</>), takeFileName)
 
 import GenBashrc.Bash
 import GenBashrc.Cache (getCacheStdFilePath)
@@ -136,26 +148,100 @@ data Context = Context
     , nixProfile :: Maybe FilePath
     , nixProfileSourced :: Bool
     , haveDirenv :: Bool
+    -- ^ Is `direnv` executable in `PATH`?
     , haveRipgrep :: Bool
+    -- ^ Have `rg` executable in `PATH`?  Ripgrep is a smart recursive grep
+    -- implementation <https://github.com/BurntSushi/ripgrep>.
     , ripgrepConfig :: Maybe FilePath
+    -- ^ Ripgrep can be configured via `RIPGREP_CONFIG_PATH` environment
+    -- variable, this will store a location of a viable configuration file, or
+    -- 'Nothing' otherwise.
     , haveFd :: Bool
-    , haveFdfind :: Bool
-    -- ^ Command `fdfind` is the same as `fd` on Debian systems.  This is to
-    -- disambiguate it from some other commands that use the same name.
+    -- ^ Is `fd` executable in `PATH`?
     --
     -- <https://github.com/sharkdp/fd>
+    , haveFdfind :: Bool
+    -- ^ Command `fdfind` is the same as `fd` on Debian systems.  This is to
+    -- disambiguate it from some other commands that use the same name.  See
+    -- also 'haveFd'.
     , haveYank :: Bool
-    , haveYankCli :: Bool
-    -- ^ Command `yank-cli` is the same as `yank` on Debian systems.  This is
-    -- to disambiguate it from some other commands that use the same name.
+    -- ^ Is `yank` executable in `PATH`?
     --
     -- <https://github.com/mptre/yank>
+    , haveYankCli :: Bool
+    -- ^ Command `yank-cli` is the same as `yank` on Debian systems.  This is
+    -- to disambiguate it from some other commands that use the same name. See
+    -- also 'haveYank'.
     , xdgRuntimeDir :: FilePath
+    , haveSensibleBrowser :: Bool
+    -- ^ Debian-like diestribution provide utility called `sensible-browser`
+    -- which tries to figure out what browser to execute:
+    --
+    -- 1. If `BROWSER` environment variable is set then use what's there, note
+    --    that the variable is not quoted in the script, i.e. more complex
+    --    values in shell syntax will work.
+    --
+    -- 2. If `DISPLAY` and `GNOME_DESKTOP_SESSION_ID` are set then it tries
+    --    these browsers in specified order:
+    --
+    --    * `/usr/bin/gnome-www-browser`
+    --    * `/usr/bin/x-www-browser`
+    --    * `/usr/bin/www-browser` (in `/usr/bin/gnome-terminal`)
+    --
+    -- 3. If only `DISPLAY` is set then it will try following:
+    --
+    --    * `/usr/bin/x-www-browser`
+    --    * `/usr/bin/www-browser` (in `/usr/bin/x-terminal-emulator`)
+    --
+    -- 4. Neither `BROWSER` nor `DISPLAY` are set then it tries to directly run,
+    --    without starting terminal first, `/usr/bin/www-www-browser`.
+    --
+    -- It may be important to note that `/usr/bin/www-browser` is a text-based
+    -- browser, e.g. `links`.  Easiest way how to figure out what is set as
+    -- `www-browser` is to look at `www-browser(1)` manual page, which is a
+    -- symbolic link to a manual page of what is being used as `www-browser`.
+    --
+    -- For `gnome-www-browser` and `x-www-browser` it is best to just run:
+    --
+    -- > update-alternatives --display gnome-www-browser
+    -- > update-alternatives --display x-www-browser
+    --
+    -- Or:
+    --
+    -- > readlink -f $(which gnome-www-browser)
+    -- > readlink -f $(which x-www-browser)
+    --
+    -- To change where `gnome-www-browser` and `x-www-browser` symbolic links
+    -- we need to reconfigure alternatives:
+    --
+    -- > sudo update-alternatives --config gnome-www-browser
+    -- > sudo update-alternatives --config x-www-browser
+    , haveFirefox :: Bool
+    -- ^ Is there a `firefox` executable in the `PATH`?
+    , haveFirefoxEsr :: Bool
+    -- ^ Is there a `firefox-esr` executable in the `PATH`?  ESR stands for
+    -- Extended Support Release.
+    , gnomeWwwBrowser :: Maybe FilePath
+    -- ^ Is there a `gnome-www-browser` executable in the `PATH`, and where is
+    -- it pointing?  'Nothing' means that there is no such executable, and
+    -- 'Just' some file path means that the file path is the target of
+    -- `gnome-www-browser` symbolic link.  See 'haveSensibleBrowser' for more
+    -- information.
+    , xWwwBrowser :: Maybe FilePath
+    -- ^ Is there a `x-www-browser` executable in the `PATH`, and where is it
+    -- pointing?  'Nothing' means that there is no such executable, and 'Just'
+    -- some file path means that the file path is the target of `x-www-browser`
+    -- symbolic link.  See 'haveSensibleBrowser' for more information.
     }
   deriving (Eq, Show)
 
 context :: IO Context
 context = do
+    -- TODO: We could potentially cache a lot of these values.  What is
+    -- troublesome is cache invalidation.  We could potentially hook it into
+    -- package manager, but what about Nix?  Other option would be hooking it
+    -- up into `yx this`.
+
     currentOs <- SystemInfo.detectOs
     hostname <- getHostName
     home <- getHomeDirectory
@@ -227,6 +313,12 @@ context = do
     haveYankCli <- haveExecutable "yank-cli"
 
     xdgRuntimeDir <- userDir XdgRuntime ""
+
+    haveSensibleBrowser <- haveExecutable "sensible-browser"
+    haveFirefox <- haveExecutable "firefox"
+    haveFirefoxEsr <- haveExecutable "firefox-esr"
+    gnomeWwwBrowser <- findExecutableAndFollowLinks "gnome-www-browser"
+    xWwwBrowser <- findExecutableAndFollowLinks "x-www-browser"
 
     let -- $ grep "^N: Name=.* Touchpad" /proc/bus/input/devices
         -- N: Name="ELAN1200:00 04F3:3059 Touchpad"
@@ -358,8 +450,8 @@ history _ = do
 setPrompt :: Context -> Bash ()
 setPrompt Context{..} = do
     function "__env_ps1" do
-        let -- Variable CD_LEVEL indicates how many times we have invoked "yx cd" and
-            -- ended up in a subshell.
+        let -- Variable CD_LEVEL indicates how many times we have invoked
+            -- "yx cd" and ended up in a subshell.
             yxCd = "${CD_LEVEL:+⟦${CD_LEVEL}⟧}"
 
             -- Variable YX_ENV_DIR indicates that we are in a local environment
@@ -443,6 +535,35 @@ bashrc ctx@Context{..} = do
         [ guard haveNeovim *> Just "nvim"
         , guard haveVim *> Just "vim"
         ]
+
+    -- We want to use Firefox at whenever possible.  Chrome has the unfortunate
+    -- property of being very aggressive when installed.
+    do
+        let -- Reason for `take 1` is that if we have `firefox` then we would
+            -- like all of it to point to `firefox` and not `firefox-esr`.
+            -- Also, this way we are basically checking for consistency as
+            -- well as if it's a Firefox.
+            firefoxes = List.take 1
+                $  mguard haveFirefox ["firefox"]
+                <> mguard haveFirefoxEsr ["firefox-esr"]
+
+            isNotFirefox path = takeFileName path `List.notElem` firefoxes
+
+            gnomeWwwBrowserIsNotFirefox =
+                maybe False isNotFirefox gnomeWwwBrowser
+
+            xWwwBrowserIsNotFirefox = maybe False isNotFirefox xWwwBrowser
+
+            needToDefineBrowserVariable = or
+                [ gnomeWwwBrowserIsNotFirefox
+                , xWwwBrowserIsNotFirefox
+                ]
+
+        when needToDefineBrowserVariable do
+            browser
+                [ guard haveFirefox *> Just "firefox"
+                , guard haveFirefoxEsr *> Just "firefox-esr"
+                ]
 
     aliases ctx
 

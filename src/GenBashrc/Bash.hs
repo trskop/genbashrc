@@ -14,7 +14,7 @@
 -- |
 -- Module:      GenBashrc.Bash
 -- Description: Monad for generating Bash scripts.
--- Copyright:   (c) 2017 Peter Trško
+-- Copyright:   (c) 2017-2020 Peter Trško
 -- License:     BSD3
 --
 -- Maintainer:  peter.trsko@gmail.com
@@ -576,7 +576,17 @@ setEditor e = do
 -- | Set @EDITOR@ and @VISUAL@ environment variables to first non-@Nothing@
 -- value.
 editor :: [Maybe BashString] -> Bash ()
-editor  = getAlt . foldMap (maybe mempty $ Alt . setEditor)
+editor = getAlt . foldMap (maybe mempty $ Alt . setEditor)
+
+-- | Set @BROWSER@ environment varaible to the specified value.
+setBrowser :: BashString -> Bash ()
+setBrowser e = do
+    set "BROWSER" e
+    export "BROWSER" Nothing
+
+-- | Set @BROWSER@ environment variable to first non-@Nothing@ value.
+browser :: [Maybe BashString] -> Bash ()
+browser = getAlt . foldMap (maybe mempty $ Alt . setBrowser)
 
 withDircollorsWhen :: Bool -> Maybe FilePath -> Bash () -> Bash ()
 withDircollorsWhen condition userDircolors actions = when condition $ do
