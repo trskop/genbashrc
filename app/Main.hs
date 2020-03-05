@@ -613,16 +613,16 @@ bashrc ctx@Context{..} = do
         -- call it there.
         line @Text "bind -m vi-command '\"\\C-f\": \"i\\C-f\"'"
 
-    -- TODO: If `habit` is defined only in direnv then this won't work.
-    onJust habit \habitBin -> do
-        alias "hb" "habit"
-        (Utils.sourceCommandWrapperCompletion habitBin ["hb"])
-
     function "__load_habit_completion" do
-        bashIfThen "[[ -n \"${HABIT_BASH_COMPLETION}\" ]]" do
-            () <- source_ ("\"${HABIT_BASH_COMPLETION}\"" :: Text)
-            -- This is to enable completion for `hb` alias (see above) as well.
-            cmd "complete -o filenames -F '_habit' hb"
+        line @Text "if [[ -n \"${HABIT_BASH_COMPLETION}\" ]]; then"
+        line @Text "    source \"${HABIT_BASH_COMPLETION}\""
+        line @Text "    alias hb=habit"
+        line @Text "    complete -o filenames -F '_habit' hb"
+        line @Text "elif type _habit &> /dev/null; then"
+        line @Text "    complete -r habit hb"
+        line @Text "    unalias hb"
+        line @Text "    unset -f _habit"
+        line @Text "fi"
 
     bashIfThen "[[ ! \"${PROMPT_COMMAND}\" =~ \"__load_habit_completion\" ]]" do
         bashIf "[[ \"${PROMPT_COMMAND}\" == *\\; ]]"
