@@ -614,14 +614,19 @@ bashrc ctx@Context{..} = do
         line @Text "bind -m vi-command '\"\\C-f\": \"i\\C-f\"'"
 
     function "__load_habit_completion" do
+        line @Text "local -a -r habitAliases=('hb')"
         line @Text "if [[ -n \"${HABIT_BASH_COMPLETION}\" ]]; then"
         line @Text "    source \"${HABIT_BASH_COMPLETION}\""
-        line @Text "    alias hb=habit"
-        line @Text "    complete -o filenames -F '_habit' hb"
-        line @Text "elif type _habit &> /dev/null; then"
-        line @Text "    complete -r habit hb"
-        line @Text "    unalias hb"
-        line @Text "    unset -f _habit"
+        line @Text "    for habitAlias in \"${habitAliases[@]}\"; do"
+        line @Text "        alias \"${habitAlias}=habit\""
+        line @Text "        complete -o filenames -F '_habit' \"${habitAlias}\""
+        line @Text "    done"
+        line @Text "else"
+        line @Text "    complete -p habit &>/dev/null && complete -r habit"
+        line @Text "    for habitAlias in \"${habitAliases[@]}\"; do"
+        line @Text "        alias \"${habitAlias}\" &>/dev/null && unalias hb"
+        line @Text "        complete -p \"${habitAlias}\" &>/dev/null && complete -r \"${habitAlias}\""
+        line @Text "    done"
         line @Text "fi"
 
     bashIfThen "[[ ! \"${PROMPT_COMMAND}\" =~ \"__load_habit_completion\" ]]" do
