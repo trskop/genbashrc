@@ -649,6 +649,9 @@ bashrc ctx@Context{..} = do
     onJust dhallToYaml Utils.sourceOptparseCompletion
     onJust dhallToText Utils.sourceOptparseCompletion
 
+    -- More usagble set of colours with dark background:
+    set "JQ_COLORS" "2;37:0;37:0;37:0;37:0;32:1;37:1;37"
+
 onJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
 onJust = for_
 
