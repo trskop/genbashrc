@@ -652,6 +652,18 @@ bashrc ctx@Context{..} = do
     -- More usagble set of colours with dark background:
     setAndExport "JQ_COLORS" "'2;37:0;37:0;37:0;37:0;32:1;37:1;37'"
 
+    -- Some tools are installed via Nix which uses its own terminfo
+    -- installation. Unfortunately Kitty terminfo is not part of it, hence some
+    -- tools not being able to use it properly. By exporting 'TERMINFO_DIRS'
+    -- with a value basically lists standard system paths should give us a
+    -- reliable way how to use such tools without breaking anything.
+    -- Documentation says that "an empty entry is interpreted as a command to
+    -- search system terminfo directory", which should give us the ability to
+    -- even include Nix-specific directories.
+    when (isJust nixProfile) do
+        setAndExport "TERMINFO_DIRS"
+            "'/etc/terminfo:/lib/terminfo:/usr/share/terminfo:'"
+
 onJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
 onJust = for_
 
