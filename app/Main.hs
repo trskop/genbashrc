@@ -583,8 +583,8 @@ bashrc ctx@Context{..} = do
                 -- This is actually the 'haveFdfind' case:
               | otherwise = "'fd --type file'"
 
-        set "FZF_DEFAULT_COMMAND" fdCommand
-        set "FZF_CTRL_T_COMMAND" fdCommand
+        setAndExport "FZF_DEFAULT_COMMAND" fdCommand
+        setAndExport "FZF_CTRL_T_COMMAND" fdCommand
 
     onJust yx \yxBin -> do
         Utils.sourceCommandWrapperCompletion yxBin []
@@ -650,7 +650,7 @@ bashrc ctx@Context{..} = do
     onJust dhallToText Utils.sourceOptparseCompletion
 
     -- More usagble set of colours with dark background:
-    set "JQ_COLORS" "'2;37:0;37:0;37:0;37:0;32:1;37:1;37'"
+    setAndExport "JQ_COLORS" "'2;37:0;37:0;37:0;37:0;32:1;37:1;37'"
 
 onJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
 onJust = for_
