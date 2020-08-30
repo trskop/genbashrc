@@ -245,9 +245,20 @@ context = do
     -- package manager, but what about Nix?  Other option would be hooking it
     -- up into `yx this`.
 
+    -- This will fail if @HOME@ envioronment is not set and we want that as it
+    -- means that we cannot rely on the current environment.
+    home <- getHomeDirectory
+
+    -- This needs testing.  We need to make sure that Nix works as expected,
+    -- however we don't want it to be too pervasive.
+    --
+    -- Reason for testing this so early is that some bits may require special
+    -- handling if Nix is profile present, but not sourced yet.
+    nixProfile <- checkFilesM [Home <</> ".nix-profile/etc/profile.d/nix.sh"]
+    nixProfileSourced <- isJust <$> lookupEnv "NIX_PATH"
+
     currentOs <- SystemInfo.detectOs
     hostname <- getHostName
-    home <- getHomeDirectory
     (userBinDir, userBinDir') <- Home ?<</> "bin"
     userBinDirInPath <- dirInPath userBinDir'
     (userLocalBinDir, userLocalBinDir') <- DotLocal ?<</> "bin"
@@ -296,11 +307,6 @@ context = do
         , DotLocal <</> "bin" </> "dhall-to-text"
         ]
 
-    -- This needs testing.  We need to make sure that Nix works as expected,
-    -- however we don't want it to be too pervasive.
-    nixProfile <- checkFilesM [Home <</> ".nix-profile/etc/profile.d/nix.sh"]
-    nixProfileSourced <- isJust <$> lookupEnv "NIX_PATH"
-
     -- Direnv is an environment switcher for the shell. This allows
     -- project-specific environment variables without cluttering the
     -- '~/.profile' file.  <https://direnv.net/>
@@ -322,7 +328,21 @@ context = do
     haveFirefoxEsr <- haveExecutable "firefox-esr"
     gnomeWwwBrowser <- findExecutableAndFollowLinks "gnome-www-browser"
     xWwwBrowser <- findExecutableAndFollowLinks "x-www-browser"
-    batBin <- findExecutableAndFollowLinks "bat"
+
+    -- Bat can be used as pager, but if it was installed via Nix it will
+    -- require special handling due to possible discrepancies in terminfo.
+    batBin <- do
+        if isJust nixProfile && not nixProfileSourced
+            then do
+                -- Nix profile will be sourced later and then
+                -- $HOME/.nix-profile/bin will be the first entry in the @PATH@,
+                -- hence checking for it before calling
+                -- 'findExecutableAndFollowLinks'.
+                nixBatBin <- checkFilesM [Home <</> ".nix-profile/bin/bat"]
+                maybe (findExecutableAndFollowLinks "bat") readlinkRecursive
+                    nixBatBin
+            else
+                findExecutableAndFollowLinks "bat"
 
     let -- $ grep "^N: Name=.* Touchpad" /proc/bus/input/devices
         -- N: Name="ELAN1200:00 04F3:3059 Touchpad"
