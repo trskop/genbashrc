@@ -31,10 +31,10 @@ import Data.Function (($), (.))
 import Data.Functor ((<$>), (<&>))
 import qualified Data.List as List (isPrefixOf, notElem, take)
 import Data.List.NonEmpty (NonEmpty((:|)))
-import Data.Maybe (Maybe(Just, Nothing), isJust, maybe)
+import Data.Maybe (Maybe(Just, Nothing), isJust, isNothing, maybe)
 import Data.Monoid (Monoid, (<>), mempty)
 import Data.Proxy (Proxy(Proxy))
-import Data.String (fromString)
+import Data.String (String, fromString)
 import System.Environment (getArgs, getProgName, lookupEnv)
 import System.IO (FilePath, IO)
 import Text.Show (Show, show)
@@ -235,6 +235,8 @@ data Context = Context
     -- symbolic link.  See 'haveSensibleBrowser' for more information.
     , batBin :: Maybe FilePath
     -- ^ Path to @bat@ (alternative to @cat@) executable.
+    , terminfoDirsEnv :: Maybe String
+    -- ^ Value of @TERMINFO_DIRS@ environment if specified otherwise 'Nothing'.
     }
   deriving (Eq, Show)
 
@@ -343,6 +345,8 @@ context = do
                     nixBatBin
             else
                 findExecutableAndFollowLinks "bat"
+
+    terminfoDirsEnv <- lookupEnv "TERMINFO_DIRS"
 
     let -- $ grep "^N: Name=.* Touchpad" /proc/bus/input/devices
         -- N: Name="ELAN1200:00 04F3:3059 Touchpad"
@@ -714,7 +718,7 @@ bashrc ctx@Context{..} = do
     -- Documentation says that "an empty entry is interpreted as a command to
     -- search system terminfo directory", which should give us the ability to
     -- even include Nix-specific directories.
-    when (isJust nixProfile) do
+    when (isNothing terminfoDirsEnv && isJust nixProfile) do
         setAndExport "TERMINFO_DIRS"
             "'/etc/terminfo:/lib/terminfo:/usr/share/terminfo:'"
 
