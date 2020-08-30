@@ -43,6 +43,7 @@ import qualified Crypto.Hash.SHA256 as SHA256 (hash)
 import qualified Data.ByteString.Base16 as Base16
 import Data.String.ToString (toString)
 import Data.Text (Text)
+import qualified Data.Text as Text (unwords)
 import qualified Data.Text.Lazy as Lazy (Text)
 import qualified Data.Text.Lazy.IO as Lazy.Text (putStr, writeFile)
 import Network.HostName (HostName, getHostName)
@@ -604,14 +605,35 @@ bashrc ctx@Context{..} = do
 
         () <- source_ ("<(" <> fromString yxBin <> " env --script)" :: Text)
 
+        -- This is based on 'fzf' bindings. They avoid using \e (escape) to
+        -- avoid delays in terminal waiting for the next key. To get the same
+        -- behaviour they bound \C-x\C-a (CTRL-x CTRL-a). Using the same
+        -- bindings as 'fzf' allows us to limit number of bindings that are in
+        -- use, however, it also has a downside if 'fzf' bindings decide to
+        -- change something and we interfere.
+        --
+        -- In the addition to the bellow CTRL-m is used which is <CR> AKA new
+        -- line.
+        bind [] "\\C-x\\C-a" "vi-movement-mode"
+        bind [] "\\C-x\\C-e" "shell-expand-line"
+        bind [] "\\C-x\\C-r" "redraw-current-line"
+
         -- TODO: This will leave an entry in Bash history.  FZF doesn't; get
         -- inspired.
-        line @Text ("bind '\"\\C-f\":\"" <> fromString yxBin <> " cd --shell\\n\"'")
-        line @Text ("bind '\"\\C-k\":\"" <> fromString yxBin <> " cd\\n\"'")
+        bind [] "\\C-f"
+            ( "\"`"
+            <> fromString yxBin
+            <> " cd --self-command --shell`\\C-x\\C-e\\C-x\\C-r\\C-m\""
+            )
+        bind [] "\\C-k"
+            ( "\"`"
+            <> fromString yxBin
+            <> " cd --self-command`\\C-x\\C-e\\C-x\\C-r\\C-m\""
+            )
 
         -- When CTRL+f is pressed in normal mode then switch to insert mode and
         -- call it there.
-        line @Text "bind -m vi-command '\"\\C-f\": \"i\\C-f\"'"
+        bind ["-m", "vi-command"] "\\C-f" "\"i\\C-f\""
 
     function "__load_habit_completion" do
         line @Text "local -a -r habitAliases=('hb')"
@@ -663,6 +685,13 @@ bashrc ctx@Context{..} = do
     when (isJust nixProfile) do
         setAndExport "TERMINFO_DIRS"
             "'/etc/terminfo:/lib/terminfo:/usr/share/terminfo:'"
+
+bind :: [Text] -> Text -> Text -> Bash ()
+bind opts key binding = line
+    ( "bind "
+    <> Text.unwords opts
+    <> " '\"" <> key <> "\":" <> binding <> "'"
+    )
 
 onJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
 onJust = for_
