@@ -29,7 +29,7 @@ import Data.Eq (Eq)
 import Data.Foldable (for_, or)
 import Data.Function (($), (.))
 import Data.Functor ((<$>), (<&>))
-import qualified Data.List as List (notElem, take)
+import qualified Data.List as List (isPrefixOf, notElem, take)
 import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Maybe (Maybe(Just, Nothing), isJust, maybe)
 import Data.Monoid (Monoid, (<>), mempty)
@@ -233,6 +233,8 @@ data Context = Context
     -- pointing?  'Nothing' means that there is no such executable, and 'Just'
     -- some file path means that the file path is the target of `x-www-browser`
     -- symbolic link.  See 'haveSensibleBrowser' for more information.
+    , batBin :: Maybe FilePath
+    -- ^ Path to @bat@ (alternative to @cat@) executable.
     }
   deriving (Eq, Show)
 
@@ -320,6 +322,7 @@ context = do
     haveFirefoxEsr <- haveExecutable "firefox-esr"
     gnomeWwwBrowser <- findExecutableAndFollowLinks "gnome-www-browser"
     xWwwBrowser <- findExecutableAndFollowLinks "x-www-browser"
+    batBin <- findExecutableAndFollowLinks "bat"
 
     let -- $ grep "^N: Name=.* Touchpad" /proc/bus/input/devices
         -- N: Name="ELAN1200:00 04F3:3059 Touchpad"
@@ -417,14 +420,23 @@ aliases Context{..} = do
     when haveMplayer $ alias "mplayer" "'mplayer -idx'"
     when haveXpdfCompat $ alias "xpdf" "xpdf-compat"
 
-    when haveTmux
-        . alias "tmux"
+    when haveTmux do
+        alias "tmux"
             $ "'TERM=xterm-256color tmux"
             <> maybe "" (\cfg -> " -f \"" <> fromString cfg <> "\"") tmuxConfig
             <> "'"
 
     when haveRipgrep $ onJust ripgrepConfig \cfg ->
         alias "rg" ("'RIPGREP_CONFIG_PATH=\"" <> fromString cfg <> "\" rg'")
+
+    when (maybe False ("/nix/store/" `List.isPrefixOf`) batBin) do
+        -- When `bat` is installed via Nix then we need to make sure it
+        -- understands our terminal emulator as that may not have been
+        -- installed by Nix and may not be among basic terminfo entries.
+        alias "bat" "'\
+            \TERMINFO_DIRS=\"/etc/terminfo:/lib/terminfo:/usr/share/terminfo:\"\
+            \ bat\
+            \'"
 
     alias "term-title" "'printf \"\\033]2;%s\\007\"'"
   where
