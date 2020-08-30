@@ -661,6 +661,11 @@ bashrc ctx@Context{..} = do
             <> fromString yxBin
             <> " cd --self-command --shell`\\C-x\\C-e\\C-x\\C-r\\C-m\""
             )
+        bind [] "\\C-\\M-f"
+            ( "\"`"
+            <> fromString yxBin
+            <> " cd --bash-command`\\C-x\\C-e\\C-x\\C-r\\C-m\""
+            )
         bind [] "\\C-k"
             ( "\"`"
             <> fromString yxBin
