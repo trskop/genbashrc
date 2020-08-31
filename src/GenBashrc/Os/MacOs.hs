@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 -- |
 -- Module:      GenBashrc.Os.MacOs
 -- Description: TODO: Module synopsis
@@ -28,7 +26,7 @@ import GenBashrc.PackageManager
 
 
 data MacOsInfo = MacOsInfo  -- TODO
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 instance HasPackageManager MacOsInfo where
     getPackageManager _info = SomePackageManager Homebrew -- TODO
@@ -36,7 +34,7 @@ instance HasPackageManager MacOsInfo where
 data PackageManager
     = Homebrew
     | MacPorts
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 instance IsPackageManager PackageManager
 

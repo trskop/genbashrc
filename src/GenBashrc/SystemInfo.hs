@@ -1,5 +1,3 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
 -- |
 -- Module:      GenBashrc.SystemInfo
 -- Description: Utilities for gathering system (HW, OS, etc.) information.

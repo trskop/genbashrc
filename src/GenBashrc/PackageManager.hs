@@ -1,6 +1,3 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 -- |
 -- Module:      GenBashrc.PackageManager
 -- Description: TODO: Module synopsis
@@ -39,7 +36,7 @@ class (Eq a, Show a, Typeable a) => IsPackageManager a where
     castPackageManager (SomePackageManager pkgMngr) = cast pkgMngr
 
 data UnknownPackageManager = UnknownPackageManager
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 instance IsPackageManager UnknownPackageManager
 

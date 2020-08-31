@@ -1,5 +1,3 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE LambdaCase #-}
 -- |
 -- Module:      GenBashrc.Distribution
 -- Description: Linux distribution specifics.
@@ -45,7 +43,7 @@ import GenBashrc.PackageManager
 newtype LinuxInfo = LinuxInfo
     { distribution :: Distribution
     }
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 instance HasPackageManager LinuxInfo where
     getPackageManager = getPackageManager . distribution
@@ -56,7 +54,7 @@ data PackageManager
     | Pacman
     | Yum
     -- ^ Yum or DNF.
-  deriving (Bounded, Enum, Eq, Show)
+  deriving stock (Bounded, Enum, Eq, Show)
 
 instance IsPackageManager PackageManager
 
@@ -74,7 +72,7 @@ data DistributionId
     -- ^ Red Hat Enterprise Linux
     | Ubuntu
     | OtherDistributionId Text
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 instance HasPackageManager DistributionId where
     getPackageManager =
@@ -86,7 +84,7 @@ data Distribution = Distribution
     , release :: Text
     , codeName :: Text
     }
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 instance HasPackageManager Distribution where
     getPackageManager = getPackageManager . id
@@ -108,7 +106,7 @@ data DebianCodename
     | Stretch
     | Buster
     | Bullseye
-  deriving (Bounded, Enum, Eq, Show)
+  deriving stock (Bounded, Enum, Eq, Show)
 
 debianDistro :: DebianCodename -> Text -> Distribution
 debianDistro cn rel = Distribution

@@ -1,11 +1,3 @@
-{-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeApplications #-}
 -- |
 -- Module:      Main
 -- Description: Generate contents of user's ~/.bashrc
@@ -240,7 +232,7 @@ data Context = Context
     , jqColorsEnv :: Maybe String
     -- ^ Value of @JQ_COLORS@ environment if specified otherwise 'Nothing'.
     }
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 context :: IO Context
 context = do

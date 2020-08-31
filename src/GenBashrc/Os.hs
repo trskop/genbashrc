@@ -1,5 +1,3 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE LambdaCase #-}
 -- |
 -- Module:      GenBashrc.Os
 -- Description: OS specific information.
@@ -37,7 +35,7 @@ import GenBashrc.PackageManager (HasPackageManager(getPackageManager))
 data OsInfo
     = Linux LinuxInfo
     | MacOs MacOsInfo
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 instance HasPackageManager OsInfo where
     getPackageManager = \case

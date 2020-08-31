@@ -1,16 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE NoMonomorphismRestriction #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 -- |
 -- Module:      GenBashrc.Bash
 -- Description: Monad for generating Bash scripts.
@@ -78,7 +65,7 @@ data BashContext = BashContext
 newtype Bash a = Bash
     { runBash :: StateT BashContext (WriterT Text.Builder Maybe) a
     }
-  deriving (Alternative, Applicative, Functor, Monad, MonadPlus)
+  deriving newtype (Alternative, Applicative, Functor, Monad, MonadPlus)
 
 class (IsString t, Monoid t, Semigroup t) => Bashable t where
     toTextBuilder :: t -> Text.Builder
@@ -108,7 +95,7 @@ class Bashable t => BashableVar t where
     var = fromText
 
 newtype CommandName = CommandName {getCommandName :: Text}
-  deriving
+  deriving newtype
     ( Bashable
     , BashableStr
     , CmdArg
@@ -126,7 +113,7 @@ instance Show CommandName where
     showsPrec d (CommandName t) = showsPrec d t
 
 newtype VariableName = VariableName {getVariableName :: Text}
-  deriving (Bashable, Eq, IsString, Monoid, Ord, Semigroup)
+  deriving newtype (Bashable, Eq, IsString, Monoid, Ord, Semigroup)
 
 instance Show VariableName where
     showsPrec d (VariableName t) = showsPrec d t
@@ -135,7 +122,7 @@ instance BashableVar VariableName where
     var = fromText
 
 newtype BashString = BashString {getBashString :: Text}
-  deriving (Bashable, BashableStr, Eq, IsString, Monoid, Ord, Semigroup)
+  deriving newtype (Bashable, BashableStr, Eq, IsString, Monoid, Ord, Semigroup)
 
 instance Show BashString where
     showsPrec d (BashString t) = showsPrec d t
@@ -145,7 +132,7 @@ instance BashableVar a => Bashable (Expand a) where
     fromText = var
 
 newtype Expand a = Expand a
-  deriving (Eq, Monoid, Ord, Semigroup)
+  deriving newtype (Eq, Monoid, Ord, Semigroup)
 
 instance IsString a => IsString (Expand a) where
     fromString = \case
@@ -386,7 +373,7 @@ instance SetPrompt 'PS4 where
 -- {{{ Shopt ------------------------------------------------------------------
 
 data SetOrUnset = Set | Unset
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 data Shopt
     = Checkwinsize
@@ -397,7 +384,7 @@ data Shopt
     -- ^ @set {-o|+o} vi@
     | NotifyOfJobTerminationImmediately
     -- ^ @set {-b|+b}@
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 shopt :: SetOrUnset -> Shopt -> Bash ()
 shopt setOrUnset = \case
@@ -482,7 +469,7 @@ expand name = cmdArgs (Just ")") (cmdArg $ "$(" <> name)
 -- {{{ Common -----------------------------------------------------------------
 
 data PrependOrAppend = Prepend | Append
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 updateVar
     :: VariableName
@@ -500,7 +487,7 @@ updateVar name@(VariableName rawName) sep updateType value =
             "\"${" <> BashString rawName <> "}" <> sep <> value <> "\""
 
 newtype PathString = PathString {getPathString :: Text}
-  deriving (Eq, IsString, Show)
+  deriving newtype (Eq, IsString, Show)
 
 instance Semigroup PathString where
     "" <>  s = s
@@ -535,16 +522,8 @@ instance IsPathString a => IsPathString (Maybe a) where
     onPathString = maybe empty . onPathString
 
 newtype PathElements t a = PathElements {getPathElements :: t a}
-  deriving
-    ( Alternative
-    , Applicative
-    , Eq
-    , Foldable
-    , Functor
-    , Monad
-    , Show
-    , Traversable
-    )
+  deriving stock (Eq, Foldable, Functor, Show, Traversable)
+  deriving newtype (Alternative, Applicative, Monad)
 
 instance (Foldable t, IsPathString a) => IsPathString (PathElements t a) where
     toPathString (PathElements ts) = foldMap toPathString ts

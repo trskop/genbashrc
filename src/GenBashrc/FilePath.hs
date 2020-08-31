@@ -1,6 +1,3 @@
-{-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE TupleSections #-}
 -- |
 -- Module:      GenBashrc.FilePath
 -- Description: FilePath utilities.
