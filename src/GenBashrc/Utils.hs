@@ -138,7 +138,7 @@ lookupFzfBashrc = checkFilesM
     ]
 
 fzfConfig :: Maybe FilePath -> Bash ()
-fzfConfig possiblyFzfBashrc = for_ possiblyFzfBashrc $ \fzfBashrc -> do
+fzfConfig possiblyFzfBashrc = for_ possiblyFzfBashrc \fzfBashrc -> do
     () <- source_ fzfBashrc
     pure ()
 
@@ -159,15 +159,15 @@ standardAliases AliasOptions{..} = do
     alias "mv" "'mv -i'"
     alias "rm" "'rm -i'"
 
-    whenOs_ linux currentOs
-        . withDircollorsWhen haveDircolors userDircolors $ do
+    whenOs_ linux currentOs do
+        withDircollorsWhen haveDircolors userDircolors do
             alias "ls" "'ls --color=auto'"
             alias "dir" "'dir --color=auto'"
             alias "vdir" "'vdir --color=auto'"
 
             portableColourisedAliases
 
-    whenOs_ macOs currentOs $ do
+    whenOs_ macOs currentOs do
         alias "ls" "'ls -G'"
 
         portableColourisedAliases
@@ -177,8 +177,8 @@ standardAliases AliasOptions{..} = do
         alias "fgrep" "'fgrep --color=auto'"
         alias "grep" "'grep --color=auto'"
 
-        when haveColorDiff
-            $ alias "diff" "colordiff"
+        when haveColorDiff do
+            alias "diff" "colordiff"
 
 -- }}} Aliases ----------------------------------------------------------------
 

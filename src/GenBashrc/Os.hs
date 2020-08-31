@@ -62,7 +62,7 @@ macOs = \case
 --
 -- @
 -- ... = do
---     'whenOs' 'linux' '$' \\linuxInfo -> do
+--     'whenOs' 'linux' \\linuxInfo -> do
 --         ...
 -- @
 whenOs :: Applicative f => (OsInfo -> Maybe a) -> OsInfo -> (a -> f ()) -> f ()
@@ -73,7 +73,7 @@ whenOs patternMatch = for_ . patternMatch
 --
 -- @
 -- ... = do
---     'whenOs_' 'linux' '$' do
+--     'whenOs_' 'linux' do
 --         ...
 -- @
 whenOs_ :: Applicative f => (OsInfo -> Maybe a) -> OsInfo -> f () -> f ()

@@ -237,6 +237,8 @@ data Context = Context
     -- ^ Path to @bat@ (alternative to @cat@) executable.
     , terminfoDirsEnv :: Maybe String
     -- ^ Value of @TERMINFO_DIRS@ environment if specified otherwise 'Nothing'.
+    , jqColorsEnv :: Maybe String
+    -- ^ Value of @JQ_COLORS@ environment if specified otherwise 'Nothing'.
     }
   deriving (Eq, Show)
 
@@ -347,6 +349,7 @@ context = do
                 findExecutableAndFollowLinks "bat"
 
     terminfoDirsEnv <- lookupEnv "TERMINFO_DIRS"
+    jqColorsEnv <- lookupEnv "JQ_COLORS"
 
     let -- $ grep "^N: Name=.* Touchpad" /proc/bus/input/devices
         -- N: Name="ELAN1200:00 04F3:3059 Touchpad"
@@ -515,8 +518,8 @@ setPrompt Context{..} = do
             $ set "PROMPT_COMMAND"
                 "\"__restore_original_ps1${PROMPT_COMMAND:+;${PROMPT_COMMAND}}\""
 
-    when haveScreen
-        . function "__screen_ps1"
+    when haveScreen do
+        function "__screen_ps1"
             $ line @Text "echo \"${WINDOW:+#${WINDOW}}\""
 
     prompt (Proxy @'PS1)
@@ -701,19 +704,20 @@ bashrc ctx@Context{..} = do
                 "\"${PROMPT_COMMAND:+${PROMPT_COMMAND};}__load_habit_completion\""
             )
 
-    when haveDirenv
-        $ source_ ("<(direnv hook bash)" :: Text)
+    when haveDirenv do
+        source_ ("<(direnv hook bash)" :: Text)
 
-    unless nixProfileSourced
-        $ onJust nixProfile source_
+    unless nixProfileSourced do
+        onJust nixProfile source_
 
     onJust dhallToBash Utils.sourceOptparseCompletion
     onJust dhallToJson Utils.sourceOptparseCompletion
     onJust dhallToYaml Utils.sourceOptparseCompletion
     onJust dhallToText Utils.sourceOptparseCompletion
 
-    -- More usagble set of colours with dark background:
-    setAndExport "JQ_COLORS" "'2;37:0;37:0;37:0;37:0;32:1;37:1;37'"
+    when (isNothing jqColorsEnv) do
+        -- More usable set of colours with dark background:
+        setAndExport "JQ_COLORS" "'2;37:0;37:0;37:0;37:0;32:1;37:1;37'"
 
     -- Some tools are installed via Nix which uses its own terminfo
     -- installation. Unfortunately Kitty terminfo is not part of it, hence some

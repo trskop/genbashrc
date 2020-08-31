@@ -22,7 +22,6 @@ import Prelude (error)
 import Control.Applicative (pure)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Bool (Bool)
-import Data.Function (($))
 import System.Info (os)
 
 import System.Directory (doesFileExist)
@@ -30,14 +29,17 @@ import System.Directory (doesFileExist)
 import GenBashrc.Os
 import GenBashrc.Os.MacOs (MacOsInfo(MacOsInfo))
 import GenBashrc.Os.Linux (LinuxInfo(LinuxInfo, distribution))
-import qualified GenBashrc.Os.Linux as Linux (DebianCodename(Buster), debianDistro)
+import qualified GenBashrc.Os.Linux as Linux
+    ( DebianCodename(Buster)
+    , debianDistro
+    )
 
 
 haveCdrom :: MonadIO io => io Bool
-haveCdrom = liftIO $ doesFileExist "/proc/sys/dev/cdrom"
+haveCdrom = liftIO (doesFileExist "/proc/sys/dev/cdrom")
 
 detectOs :: MonadIO io => io OsInfo
-detectOs = pure $ case os of
+detectOs = pure case os of
     "darwin" -> MacOs MacOsInfo -- TODO
     "linux" -> Linux LinuxInfo
         { distribution = Linux.debianDistro Linux.Buster "testing"  -- TODO

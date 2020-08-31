@@ -186,8 +186,8 @@ genBashCached :: FilePath -> Bash () -> IO Lazy.Text
 genBashCached cacheFile = cached cacheFile genBash
 
 startLineIfNotAlready :: Bash ()
-startLineIfNotAlready = Bash $ do
-    (lvl, step) <- state $ \ctx@BashContext{indentLevel, indentStep, inLine} ->
+startLineIfNotAlready = Bash do
+    (lvl, step) <- state \ctx@BashContext{indentLevel, indentStep, inLine} ->
         if inLine
             then ((0, indentStep), ctx)
             else ((fromIntegral indentLevel, indentStep), ctx{inLine = True})
@@ -408,7 +408,7 @@ shopt setOrUnset = \case
   where
     setCmd opt arg = do
         text @Text "set "
-        char $ case setOrUnset of
+        char case setOrUnset of
             Set -> '-'
             Unset -> '+'
         char opt
@@ -420,7 +420,7 @@ shopt setOrUnset = \case
 
     shoptCmd arg = do
         text @Text "shopt "
-        text @Text $ case setOrUnset of
+        text @Text case setOrUnset of
             Set -> "-s"
             Unset -> "-u"
         char ' '
@@ -493,9 +493,11 @@ updateVar
     -- ^ Value to prepend/append.
     -> Bash ()
 updateVar name@(VariableName rawName) sep updateType value =
-    set' name $ case updateType of
-        Prepend -> "\"" <> value <> sep <> "${" <> BashString rawName <> "}\""
-        Append  -> "\"${" <> BashString rawName <> "}" <> sep <> value <> "\""
+    set' name case updateType of
+        Prepend ->
+            "\"" <> value <> sep <> "${" <> BashString rawName <> "}\""
+        Append ->
+            "\"${" <> BashString rawName <> "}" <> sep <> value <> "\""
 
 newtype PathString = PathString {getPathString :: Text}
   deriving (Eq, IsString, Show)
@@ -589,7 +591,7 @@ browser :: [Maybe BashString] -> Bash ()
 browser = getAlt . foldMap (maybe mempty $ Alt . setBrowser)
 
 withDircollorsWhen :: Bool -> Maybe FilePath -> Bash () -> Bash ()
-withDircollorsWhen condition userDircolors actions = when condition $ do
+withDircollorsWhen condition userDircolors actions = when condition do
     evalDircolors userDircolors
     actions
 
