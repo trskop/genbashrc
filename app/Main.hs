@@ -18,7 +18,7 @@ import Control.Applicative (Applicative, (*>), liftA2, pure)
 import Control.Monad ((>>=), guard, unless, when)
 import Data.Bool (Bool(False), (&&), (||), not, otherwise)
 import Data.Eq (Eq)
-import Data.Foldable (for_, or)
+import Data.Foldable (and, for_, or)
 import Data.Function (($), (.))
 import Data.Functor ((<$>), (<&>))
 import qualified Data.List as List (isPrefixOf, notElem, take)
@@ -231,6 +231,12 @@ data Context = Context
     -- ^ Value of @TERMINFO_DIRS@ environment if specified otherwise 'Nothing'.
     , jqColorsEnv :: Maybe String
     -- ^ Value of @JQ_COLORS@ environment if specified otherwise 'Nothing'.
+    , fzfDefaultCommandEnv :: Maybe String
+    -- ^ Value of @FZF_DEFAULT_COMMAND@ envioronment variable if specified
+    -- otherwise 'Nothing'.
+    , fzfCtrlTCommandEnv :: Maybe String
+    -- ^ Value of @FZF_CTRL_T_COMMAND@ envioronment variable if defined
+    -- otherwise 'Nothing'
     }
   deriving stock (Eq, Show)
 
@@ -342,6 +348,8 @@ context = do
 
     terminfoDirsEnv <- lookupEnv "TERMINFO_DIRS"
     jqColorsEnv <- lookupEnv "JQ_COLORS"
+    fzfDefaultCommandEnv <- lookupEnv "FZF_DEFAULT_COMMAND"
+    fzfCtrlTCommandEnv <- lookupEnv "FZF_CTRL_T_COMMAND"
 
     let -- $ grep "^N: Name=.* Touchpad" /proc/bus/input/devices
         -- N: Name="ELAN1200:00 04F3:3059 Touchpad"
@@ -609,14 +617,24 @@ bashrc ctx@Context{..} = do
     when haveGit $ onJust gitPromptScript source
 
     Utils.fzfConfig fzfBashrc
-    when (isJust fzfBashrc && (haveFd || haveFdfind)) do
+    let setFzfEnvVars = and
+            [ isJust fzfBashrc
+            -- Short-circuit if both environment variables are already set.
+            , isNothing fzfDefaultCommandEnv || isNothing fzfCtrlTCommandEnv
+            -- We need 'fd' or 'fdfind' (Debian) to be present to configure FZF
+            -- to use one of them.
+            , haveFd || haveFdfind
+            ]
+    when setFzfEnvVars do
         let fdCommand
               | haveFd = "'fd --type file'"
                 -- This is actually the 'haveFdfind' case:
-              | otherwise = "'fd --type file'"
+              | otherwise = "'fdfind --type file'"
 
-        setAndExport "FZF_DEFAULT_COMMAND" fdCommand
-        setAndExport "FZF_CTRL_T_COMMAND" fdCommand
+        when (isNothing fzfDefaultCommandEnv) do
+            setAndExport "FZF_DEFAULT_COMMAND" fdCommand
+        when (isNothing fzfCtrlTCommandEnv) do
+            setAndExport "FZF_CTRL_T_COMMAND" fdCommand
 
     onJust yx \yxBin -> do
         Utils.sourceCommandWrapperCompletion yxBin []
