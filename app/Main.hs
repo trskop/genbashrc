@@ -667,8 +667,6 @@ bashrc ctx@Context{..} = do
         bind [] "\\C-x\\C-e" "shell-expand-line"
         bind [] "\\C-x\\C-r" "redraw-current-line"
 
-        -- TODO: This will leave an entry in Bash history.  FZF doesn't; get
-        -- inspired.
         bind [] "\\C-f"
             ( "\"`"
             <> fromString yxBin
@@ -685,9 +683,10 @@ bashrc ctx@Context{..} = do
             <> " cd --self-command`\\C-x\\C-e\\C-x\\C-r\\C-m\""
             )
 
-        -- When CTRL+f is pressed in normal mode then switch to insert mode and
-        -- call it there.
+        -- When CTRL+f or CTRL+ALT+f is pressed in normal mode then switch to
+        -- insert mode and call it there.
         bind ["-m", "vi-command"] "\\C-f" "\"i\\C-f\""
+        bind ["-m", "vi-command"] "\\C-\\M-f" "\"i\\C-\\M-f\""
 
     function "__load_habit_completion" do
         line @Text "local -a -r habitAliases=('hb')"
