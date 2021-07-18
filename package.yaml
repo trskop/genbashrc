@@ -1,0 +1,142 @@
+name: &this genbashrc
+version: !include ./version.json
+synopsis: |
+  EDSL and application for generating .bashrc files.
+description: |
+  Generate @.bashrc@ using Haskell EDSL.
+
+  Most conditions, e.g. file existence checks, can be resolved in the
+  generator, therefore, the result will be a very simple and optimised
+  @.bashrc@ for a particular environment.
+
+  See [GitHub README](https://github.com/trskop/genbashrc#readme) for more
+  information.
+
+github: trskop/genbashrc
+license: BSD3
+license-file: LICENSE
+author: Peter Trško
+maintainer: peter.trsko@gmail.com
+copyright: (c) 2017-2021 Peter Trško
+category: Shell, System, Tools
+
+flags:
+  static:
+    description: Build static executables
+    manual: true
+    default: false
+
+  nix:
+    description: Nix-specific tweaks for executables
+    manual: true
+    default: false
+
+extra-source-files:
+  - ChangeLog.md
+  - README.md
+
+default-extensions:
+  - BlockArguments
+  - DataKinds
+  - DefaultSignatures
+  - DeriveFunctor
+  - DeriveGeneric
+  - DeriveTraversable
+  - DerivingStrategies
+  - DuplicateRecordFields
+  - FlexibleContexts
+  - FlexibleInstances
+  - GADTs
+  - GeneralizedNewtypeDeriving
+  - InstanceSigs
+  - LambdaCase
+  - MultiWayIf
+  - NamedFieldPuns
+  - NoImplicitPrelude
+  - NoMonomorphismRestriction
+  - OverloadedStrings
+  - PatternSynonyms
+  - RankNTypes
+  - RecordWildCards
+  - ScopedTypeVariables
+  - StandaloneDeriving
+  - TupleSections
+  - TypeApplications
+  - TypeFamilies
+  - TypeOperators
+
+dependencies:
+  - base >=4.14 && <5
+  # ^ base 4.14.0.0 was bundled with GHC 8.10.1, which is the minimal GHC
+  # version now supported.
+
+ghc-options:
+  - "-Wall"
+  - "-Wcompat"
+  - "-Wimplicit-prelude"
+  - "-Wincomplete-record-updates"
+  - "-Wpartial-fields"
+  - "-Wmissing-deriving-strategies" # GHC >8.8
+  - "-Wredundant-record-wildcards" # GHC >8.10
+  - "-Wunused-packages" # GHC >8.10
+  - "-Wunused-record-wildcards" # GHC >8.10
+
+library:
+  source-dirs: src
+
+  dependencies:
+    - directory
+    - filepath
+    - mtl
+    - text
+    - tostring
+
+  when:
+    - condition: flag(static)
+      ghc-options:
+        - -static
+        - -O2
+        - -fPIC
+
+executables:
+  *this:
+    source-dirs: app
+    main: Main.hs
+    dependencies:
+      - *this
+
+      - base16-bytestring
+      - cryptohash-sha256
+      - directory
+      - filepath
+      - hostname
+      - text
+      - tostring
+
+    ghc-options: ["-threaded", "-rtsopts", "-with-rtsopts=-N"]
+
+    when:
+      - condition: flag(static)
+        ghc-options:
+          - -static
+          - -O2
+          - -fPIC
+        cpp-options:
+          - -DSTATIC_EXECUTABLE
+        cc-options:
+          - -static
+        ld-options:
+          - -static
+          - -pthread
+
+      - condition: flag(nix)
+        cpp-options:
+          - -DNIX_EXECUTABLE
+
+tests:
+  genbashrc-test:
+    source-dirs: test
+    main: Main.hs
+    dependencies:
+      - *this
+    ghc-options: ["-threaded", "-rtsopts", "-with-rtsopts=-N"]

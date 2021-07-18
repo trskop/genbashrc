@@ -1,7 +1,7 @@
 -- |
 -- Module:      GenBashrc.Bash
 -- Description: Monad for generating Bash scripts.
--- Copyright:   (c) 2017-2020 Peter Trško
+-- Copyright:   (c) 2017-2021 Peter Trško
 -- License:     BSD3
 --
 -- Maintainer:  peter.trsko@gmail.com
@@ -25,6 +25,7 @@ import Data.Eq (Eq, (/=), (==))
 import Data.Foldable (Foldable, foldMap)
 import Data.Function (($), (.), flip, id)
 import Data.Functor (Functor, (<$))
+import Data.Kind (Type)
 import qualified Data.List as List (break, intersperse, map, nub)
 import Data.Maybe (Maybe(Just, Nothing), fromMaybe, maybe)
 import Data.Monoid (Alt(Alt, getAlt), Monoid(mempty, mappend), (<>), mconcat)
@@ -418,7 +419,7 @@ shopt setOrUnset = \case
 -- {{{ Command ----------------------------------------------------------------
 
 class CmdArgs a where
-    type CmdResult a :: *
+    type CmdResult a :: Type
     cmdArgs :: Maybe Text.Builder -> Text.Builder -> a
 
 instance CmdArgs (Bash ()) where
@@ -588,7 +589,7 @@ data HistControlAtrr
     = HistIgnorespace
     | HistIgnoredups
     | HistErasedups
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 histignoreboth :: [HistControlAtrr]
 histignoreboth = [HistIgnorespace, HistIgnoredups]
