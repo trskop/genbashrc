@@ -106,6 +106,7 @@ data Context = Context
     , haveTouchpad :: Bool
     , haveSudo :: Bool
     , haveMplayer :: Bool
+    , mplayerConfigDir :: Maybe FilePath
     , haveXpdfCompat :: Bool
     , haveColorDiff :: Bool
     , haveScreen :: Bool
@@ -274,6 +275,7 @@ context = do
     haveNeovim <- haveExecutable "nvim"
     haveNeovimRemote <- haveExecutable "nvr"
     haveMplayer <- haveExecutable "mplayer"
+    mplayerConfigDir <- checkDirsM [xdgConfig <</> "mplayer"]
     haveXpdfCompat <- haveXpdfCompatExecutable
     haveColorDiff <- haveExecutable "colordiff"
     haveScreen <- haveExecutable "screen"
@@ -747,6 +749,9 @@ bashrc ctx@Context{..} = do
     when (isNothing terminfoDirsEnv && isJust nixProfile) do
         setAndExport "TERMINFO_DIRS"
             "'/etc/terminfo:/lib/terminfo:/usr/share/terminfo:'"
+
+    onJust mplayerConfigDir \dir ->
+        setAndExport "MPLAYER_HOME" (fromString dir)
 
 bind :: [Text] -> Text -> Text -> Bash ()
 bind opts key binding = line

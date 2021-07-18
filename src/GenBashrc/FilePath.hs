@@ -18,6 +18,7 @@ module GenBashrc.FilePath
     , checkFiles
     , checkFilesM
     , checkDirs
+    , checkDirsM
     , isInDir
     , isSymlinkTo
 
@@ -224,6 +225,16 @@ checkDirs (dir : dirs) = liftIO do
     if doesExist
         then pure (Just dir)
         else checkDirs dirs
+
+-- | Find first directory that exists, or return 'Nothing' of none.
+checkDirsM :: MonadIO io => [io FilePath] -> io (Maybe FilePath)
+checkDirsM []                 = pure Nothing
+checkDirsM (getDir : getDirs) = do
+    dir <- getDir
+    doesExist <- liftIO (doesDirectoryExist dir)
+    if doesExist
+        then pure (Just dir)
+        else checkDirsM getDirs
 
 -- | Check if @path@ is in @dir@, i.e. @dir@ is a directory prefix of @path@.
 --
