@@ -1,7 +1,7 @@
 -- |
 -- Module:      GenBashrc.FilePath
 -- Description: FilePath utilities.
--- Copyright:   (c) 2017-2020 Peter Trško
+-- Copyright:   (c) 2017-2021 Peter Trško
 -- License:     BSD3
 --
 -- Maintainer:  peter.trsko@gmail.com
@@ -19,6 +19,7 @@ module GenBashrc.FilePath
     , checkFilesM
     , checkDirs
     , isInDir
+    , isSymlinkTo
 
     -- * User Directories
     , UserDirectory(..)
@@ -32,10 +33,10 @@ module GenBashrc.FilePath
     )
   where
 
-import Control.Applicative (pure)
+import Control.Applicative ((<*>), pure)
 import Control.Monad ((>=>), (>>=))
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Bool (Bool)
+import Data.Bool (Bool(False))
 import Data.Foldable (any)
 import Data.Function (($), (.), flip, on)
 import Data.Functor ((<$>))
@@ -105,6 +106,35 @@ dirInPath dir = any (equalDirs dir) <$> liftIO getSearchPath
   where
     equalDirs :: FilePath -> FilePath -> Bool
     equalDirs = equalFilePath `on` (dropTrailingPathSeparator . normalise)
+
+isSymlinkTo
+    :: MonadIO io
+    => FilePath
+    -- ^ Source path that we are checking. If it's not a symbolic link then the
+    -- whole function returns `False` immediately. If it's a symlink then we
+    -- check that it points to the same path as the second path.
+    -> FilePath
+    -- ^ Destination path, that must exist.
+    -> io Bool
+isSymlinkTo src dst = liftIO do
+    pathExists <- doesPathExist src
+    if pathExists
+        then do
+            isSymlink <- pathIsSymbolicLink src
+            if isSymlink
+                then do
+                    target1 <- getSymbolicLinkTarget src >>= readlinkRecursive
+                    target2 <- readlinkRecursive dst
+                    pure do
+                        fromMaybe False (equalFilePath <$> target1 <*> target2)
+
+                else
+                    -- The `src` argument is not a symbolic link. In other
+                    -- words it cannot point anywhere.
+                    pure False
+        else
+            -- The `src` argument doesn't exist, i.e. it cannot point anywhere.
+            pure False
 
 data UserDirectory
     = Home

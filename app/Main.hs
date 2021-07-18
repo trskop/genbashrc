@@ -1,7 +1,7 @@
 -- |
 -- Module:      Main
 -- Description: Generate contents of user's ~/.bashrc
--- Copyright:   (c) 2017-2020 Peter Trško
+-- Copyright:   (c) 2017-2021 Peter Trško
 -- License:     BSD3
 --
 -- Maintainer:  peter.trsko@gmail.com
@@ -122,6 +122,9 @@ data Context = Context
     , userBinDir :: Maybe FilePath
     , userBinDir' :: FilePath
     , userBinDirInPath :: Bool
+    , userBinDirIsUserLocalBinDir :: Bool
+    -- ^ Is @~\/.bin@ a symbolic link pointing to the same destination as
+    -- @~\/.local\/bin@?
     , userLocalBinDir :: Maybe FilePath
     , userLocalBinDir' :: FilePath
     , userLocalBinDirInPath :: Bool
@@ -265,6 +268,7 @@ context = do
     userBinDirInPath <- dirInPath userBinDir'
     (userLocalBinDir, userLocalBinDir') <- DotLocal ?<</> "bin"
     userLocalBinDirInPath <- dirInPath userLocalBinDir'
+    userBinDirIsUserLocalBinDir <- isSymlinkTo userBinDir' userLocalBinDir'
     haveSudo <- haveExecutable "sudo"
     haveVim <- haveExecutable "vim"
     haveNeovim <- haveExecutable "nvim"
@@ -564,7 +568,11 @@ bashrc ctx@Context{..} = do
     onJust lesspipeCommand evalLesspipe
 
     pathUpdated <- updatePath Prepend $ PathElements
-        [ guard (not userBinDirInPath) *> userBinDir
+        [ -- We want to start using ~/.local/bin for everything, but a lot of
+          -- configuration still relies on ~/bin. This will allow us to
+          -- transition easily and safely.
+          guard (not userBinDirInPath && not userBinDirIsUserLocalBinDir)
+            *> userBinDir
         , guard (not userLocalBinDirInPath) *> userLocalBinDir
         ]
     exportPathIf pathUpdated
