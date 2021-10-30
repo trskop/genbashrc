@@ -35,7 +35,7 @@ module GenBashrc.FilePath
   where
 
 import Control.Applicative ((<*>), pure)
-import Control.Monad ((>=>), (>>=))
+import Control.Monad ((>=>))
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Bool (Bool(False))
 import Data.Foldable (any)
@@ -53,11 +53,11 @@ import System.Directory
         , XdgConfig
         , XdgData
         )
+    , canonicalizePath
     , doesDirectoryExist
     , doesFileExist
     , doesPathExist
     , getHomeDirectory
-    , getSymbolicLinkTarget
     , getXdgDirectory
     , pathIsSymbolicLink
     )
@@ -90,17 +90,12 @@ findExecutableAndFollowLinks =
 -- symbolic link doesn't exist then 'Nothing' is returned.
 readlinkRecursive :: MonadIO io => FilePath -> io (Maybe FilePath)
 readlinkRecursive path = liftIO do
-    pathExists <- doesPathExist path
-    if pathExists
-        then do
-            isSymlink <- pathIsSymbolicLink path
-            if isSymlink
-                then
-                    getSymbolicLinkTarget path >>= readlinkRecursive
-                else
-                    pure (Just path)
-        else
-            pure Nothing
+    canonicalPath <- canonicalizePath path
+    pathExists <- doesPathExist canonicalPath
+    pure
+        if pathExists
+            then Just canonicalPath
+            else Nothing
 
 dirInPath :: MonadIO io => FilePath -> io Bool
 dirInPath dir = any (equalDirs dir) <$> liftIO getSearchPath
@@ -115,26 +110,23 @@ isSymlinkTo
     -- whole function returns `False` immediately. If it's a symlink then we
     -- check that it points to the same path as the second path.
     -> FilePath
-    -- ^ Destination path, that must exist.
+    -- ^ Destination path, that must exist. If the destination path is a
+    -- symbolic link then it is resolved to its final destination first.
     -> io Bool
-isSymlinkTo src dst = liftIO do
-    pathExists <- doesPathExist src
-    if pathExists
+isSymlinkTo src dst = do
+    target1 <- readlinkRecursive src
+    sourceIsASymlinkAndTargetExists <- if isJust target1
+        then liftIO (pathIsSymbolicLink src)
+        else pure False
+    if sourceIsASymlinkAndTargetExists
         then do
-            isSymlink <- pathIsSymbolicLink src
-            if isSymlink
-                then do
-                    target1 <- getSymbolicLinkTarget src >>= readlinkRecursive
-                    target2 <- readlinkRecursive dst
-                    pure do
-                        fromMaybe False (equalFilePath <$> target1 <*> target2)
-
-                else
-                    -- The `src` argument is not a symbolic link. In other
-                    -- words it cannot point anywhere.
-                    pure False
+            target2 <- readlinkRecursive dst
+            pure do
+                fromMaybe False (equalFilePath <$> target1 <*> target2)
         else
-            -- The `src` argument doesn't exist, i.e. it cannot point anywhere.
+            -- The `src` argument is not a symbolic link, or it or one of its
+            -- components does not exist. In other words it does not point
+            -- anywhere.
             pure False
 
 data UserDirectory
