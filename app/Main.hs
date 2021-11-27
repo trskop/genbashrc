@@ -261,7 +261,7 @@ context = do
     -- Reason for testing this so early is that some bits may require special
     -- handling if Nix is profile present, but not sourced yet.
     nixProfile <- checkFilesM [Home <</> ".nix-profile/etc/profile.d/nix.sh"]
-    nixProfileSourced <- isJust <$> lookupEnv "NIX_PATH"
+    nixProfileSourced <- isJust <$> lookupEnv "NIX_PROFILES"
 
     currentOs <- SystemInfo.detectOs
     hostname <- getHostName
