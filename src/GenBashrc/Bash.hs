@@ -17,7 +17,7 @@ module GenBashrc.Bash
 import Prelude ((-), (+), error, fromIntegral)
 
 import Control.Applicative (Alternative, Applicative, (*>), (<|>), empty, pure)
-import Control.Monad (Monad, MonadPlus, guard, replicateM_, when)
+import Control.Monad (Monad, MonadPlus, guard, replicateM_, unless, when)
 import Data.Bool (Bool(False, True))
 import Data.Char (Char)
 import Data.Coerce (coerce)
@@ -570,10 +570,12 @@ setBrowser e = do
 browser :: [Maybe BashString] -> Bash ()
 browser = getAlt . foldMap (maybe mempty $ Alt . setBrowser)
 
-withDircollorsWhen :: Bool -> Maybe FilePath -> Bash () -> Bash ()
-withDircollorsWhen condition userDircolors actions = when condition do
-    evalDircolors userDircolors
-    actions
+withDircollorsWhen :: Bool -> Bool -> Maybe FilePath -> Bash () -> Bash ()
+withDircollorsWhen condition dircolorsSourced userDircolors actions =
+    when condition do
+        unless dircolorsSourced do
+            evalDircolors userDircolors
+        actions
 
 evalDircolors :: Maybe FilePath -> Bash ()
 evalDircolors userDircolors =

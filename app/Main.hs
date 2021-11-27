@@ -115,6 +115,8 @@ data Context = Context
     , haveNeovimRemote :: Bool
     , haveVim :: Bool
     , haveDircolors :: Bool
+    , dircolorsSourced :: Bool
+    , userDircolors :: Maybe FilePath
     , haveXinput :: Bool
     , haveCdrom :: Bool
     , haveGit :: Bool
@@ -131,8 +133,8 @@ data Context = Context
     , userLocalBinDirInPath :: Bool
     , bashCompletionScript :: Maybe FilePath
     , gitPromptScript :: Maybe FilePath
-    , userDircolors :: Maybe FilePath
     , lesspipeCommand :: Maybe CommandName
+    , lesspipeSourced :: Bool
     , stackBin :: Maybe FilePath
     , tmuxConfig :: Maybe FilePath
     , fzfBashrc :: Maybe FilePath
@@ -279,13 +281,29 @@ context = do
     haveXpdfCompat <- haveXpdfCompatExecutable
     haveColorDiff <- haveExecutable "colordiff"
     haveScreen <- haveExecutable "screen"
+
     haveDircolors <- haveExecutable "dircolors"
+    dircolorsSourced <- isJust <$> lookupEnv "LS_COLORS"
+    -- Command `dircolors` loads user configuration only on certain
+    -- distributions, vanilla version doesn't do this. See dir_colors(5) for
+    -- more information.
+    userDircolors <- checkFilesM
+        [ xdgConfig <</> "dircolors" </> "config" -- Non-standard
+        , Home <</> ".dircolors" -- Non-standard, but common
+        , Home <</> ".dir_colors"
+        ]
+
     haveXinput <- haveExecutable "xinput"
     haveGit <- haveExecutable "git"
+
     lesspipeCommand <- Utils.lookupLesspipeCommand
+    lesspipeSourced <- do
+        lessOpen <- lookupEnv "LESSOPEN"
+        lessClose <- lookupEnv "LESSCLOSE"
+        pure (isJust lessOpen && isJust lessClose)
+
     bashCompletionScript <- Utils.lookupBashCompletionScript
     gitPromptScript <- Utils.lookupGitPromptScript currentOs
-    userDircolors <- checkFilesM [Home <</> ".dircolors"]
     haveCdrom <- SystemInfo.haveCdrom
     stackBin <- Utils.lookupStack
 
@@ -567,7 +585,8 @@ bashrc ctx@Context{..} = do
 
     history ctx
 
-    onJust lesspipeCommand evalLesspipe
+    unless lesspipeSourced do
+        onJust lesspipeCommand evalLesspipe
 
     pathUpdated <- updatePath Prepend $ PathElements
         [ -- We want to start using ~/.local/bin for everything, but a lot of

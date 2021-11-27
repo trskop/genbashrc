@@ -146,6 +146,7 @@ data AliasOptions = AliasOptions
     { currentOs :: OsInfo
     , haveColorDiff :: Bool
     , haveDircolors :: Bool
+    , dircolorsSourced :: Bool
     , userDircolors :: Maybe FilePath
     }
 
@@ -156,7 +157,7 @@ standardAliases AliasOptions{..} = do
     alias "rm" "'rm -i'"
 
     whenOs_ linux currentOs do
-        withDircollorsWhen haveDircolors userDircolors do
+        withDircollorsWhen haveDircolors dircolorsSourced userDircolors do
             alias "ls" "'ls --color=auto'"
             alias "dir" "'dir --color=auto'"
             alias "vdir" "'vdir --color=auto'"
