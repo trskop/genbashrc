@@ -17,7 +17,7 @@ license: BSD3
 license-file: LICENSE
 author: Peter Trško
 maintainer: peter.trsko@gmail.com
-copyright: (c) 2017-2021 Peter Trško
+copyright: (c) 2017-2022 Peter Trško
 category: Shell, System, Tools
 
 flags:
@@ -106,10 +106,14 @@ executables:
       - *this
 
       - base16-bytestring
+      - bytestring
       - cryptohash-sha256
+      - cryptonite
       - directory
+      - executable-path
       - filepath
       - hostname
+      - template-haskell
       - text
       - tostring
 

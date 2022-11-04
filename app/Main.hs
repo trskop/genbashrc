@@ -1,7 +1,8 @@
+{-# LANGUAGE TemplateHaskell #-}
 -- |
 -- Module:      Main
 -- Description: Generate contents of user's ~/.bashrc
--- Copyright:   (c) 2017-2021 Peter Trško
+-- Copyright:   (c) 2017-2022 Peter Trško
 -- License:     BSD3
 --
 -- Maintainer:  peter.trsko@gmail.com
@@ -32,18 +33,24 @@ import System.IO (FilePath, IO)
 import Text.Show (Show, show)
 
 import qualified Crypto.Hash.SHA256 as SHA256 (hash)
+import qualified Crypto.Random as Crypto (getRandomBytes)
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Base16 as Base16
 import Data.String.ToString (toString)
 import Data.Text (Text)
 import qualified Data.Text as Text (unwords)
 import qualified Data.Text.Lazy as Lazy (Text)
 import qualified Data.Text.Lazy.IO as Lazy.Text (putStr, writeFile)
+import qualified Language.Haskell.TH as TH (runIO)
+import qualified Language.Haskell.TH.Syntax as TH (lift)
 import Network.HostName (HostName, getHostName)
 import System.Directory (getHomeDirectory)
+import System.Environment.Executable (ScriptPath(..), getScriptPath)
+
 import System.FilePath ((</>), takeFileName)
 
 import GenBashrc.Bash
-import GenBashrc.Cache (getCacheStdFilePath)
+import GenBashrc.Cache (cache, getCacheStdFilePath)
 import GenBashrc.FilePath
 import GenBashrc.Os
 import qualified GenBashrc.Os.Linux as Linux
@@ -82,18 +89,48 @@ main = getArgs >>= \case
         error "Usage: genbashrc [--cached] [OUTPUT_FILE]"
 
 main' :: (Lazy.Text -> IO a) -> IO a
-main' writeOutput = context >>= writeOutput . genBash . bashrc
+main' writeOutput = getContext >>= writeOutput . genBash . bashrc
 
 mainCached :: (Lazy.Text -> IO a) -> IO a
 mainCached writeOutput = do
-    appName <- getProgName
-    ctx <- context
-    -- TODO: Hash of genbashrc executable should be used instead of "1".  That
-    -- way if genbashrc changes outdated cache won't be used.
-    cache <- getCacheStdFilePath appName "1" (hashContext ctx)
-    genBashCached cache (bashrc ctx) >>= writeOutput
+    context <- getContext
+    (genbashrcFile, cacheFile) <- do
+        let -- Each executable has a different random value. Build system needs
+            -- to guarantee that the main binary is recompiled when
+            -- dependencies are changed. Stack does this for us.
+            randomValue =
+                $(TH.runIO (Crypto.getRandomBytes 128 :: IO ByteString)
+                    >>= TH.lift . toString)
+
+        generatorFile <- getScriptPath <&> \case
+            Executable file -> Just file
+            RunGHC file -> Just file
+            Interactive -> Nothing
+
+        -- TODO: Should we get the app name from getScriptPath as well?
+        appName <- getProgName
+
+        -- TODO: Would it be better to have a more efficient encoding for
+        --       context?
+        let cacheFileName =
+                -- When executable changes we get a different value. Because
+                -- `bashrc` function is pure we get the same value when context
+                -- is the same between executions.
+                sha256 (fromString randomValue <> fromString (show context))
+
+        cacheFile <- getCacheStdFilePath appName cacheFileName
+
+        pure (generatorFile, cacheFile)
+
+    cache cacheFile (genBash (bashrc context))
+    writeOutput $ genBash do
+        -- TODO: Handle special characters in file names.
+        onJust genbashrcFile \file ->
+            setAndExport "GENBASHRC" (fromString file)
+        setAndExport "GENBASHRC_CACHE" (fromString cacheFile)
+        source cacheFile
   where
-    hashContext = toString . Base16.encode . SHA256.hash . fromString . show
+    sha256 = Base16.encode . SHA256.hash
 
 -- | All the information we gathered from the system and users environment.
 --
@@ -246,8 +283,8 @@ data Context = Context
     }
   deriving stock (Eq, Show)
 
-context :: IO Context
-context = do
+getContext :: IO Context
+getContext = do
     -- TODO: We could potentially cache a lot of these values.  What is
     -- troublesome is cache invalidation.  We could potentially hook it into
     -- package manager, but what about Nix?  Other option would be hooking it
